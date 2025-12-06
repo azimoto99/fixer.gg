@@ -3314,74 +3314,37 @@ function spawnEnemies(scene, count) {
 }
 
 function hitEnemy(bullet, enemy) {
-    // Safety checks
+    // Simple safety checks
     if (!bullet || !bullet.active || !enemy || !enemy.active) {
         return;
     }
     
-    // Additional check for boss - ensure body exists and is active
-    if (enemy.isBoss) {
-        const healthPercent = (enemy.health / enemy.maxHealth * 100).toFixed(1);
-        if (!enemy.body) {
-            console.error(`Boss has no body at ${healthPercent}% health! Active: ${enemy.active}, Phase: ${enemy.bossPhase}`);
-            return;
-        }
-        if (!enemy.body.enable) {
-            console.warn(`Boss body is disabled at ${healthPercent}% health (Phase ${enemy.bossPhase}), re-enabling!`);
-            enemy.body.enable = true;
-            // Don't return - continue with the hit
-        }
-        // Always ensure body is enabled for boss
-        if (!enemy.body.enable) {
-            enemy.body.enable = true;
-        }
-        // Debug: Log when boss is hit but might not take damage
-        if (enemy.bossPhase === 2) {
-            console.log(`Boss Phase 2 hit attempt - Body enabled: ${enemy.body.enable}, Active: ${enemy.active}, HasShield: ${enemy.hasShield}`);
-        }
-    }
-    
     // Prevent multiple hits from same bullet
-    // Always ensure hitEnemies Set exists and is valid
     if (!bullet.hitEnemies) {
         bullet.hitEnemies = new Set();
     }
-    
-    // Check if this bullet has already hit this enemy
     if (bullet.hitEnemies.has(enemy)) {
         return;
     }
-    
-    // Mark this enemy as hit by this bullet
     bullet.hitEnemies.add(enemy);
     
     // Get damage value
     const damage = bullet.damage || bulletDamage;
     
-    // Check for enemy shield
-    if (enemy.hasShield && enemy.shieldActive) {
-        if (enemy.isBoss) {
-            console.warn('Boss has shield active - this should not happen! Disabling shield.');
-            enemy.hasShield = false;
-            enemy.shieldActive = false;
-            // Continue with damage - don't return
-        } else {
-            enemy.shieldActive = false;
-            return;
-        }
+    // Check for enemy shield (only for non-boss enemies)
+    if (!enemy.isBoss && enemy.hasShield && enemy.shieldActive) {
+        enemy.shieldActive = false;
+        return;
     }
     
-    // Apply damage
-    enemy.health = Math.max(0, enemy.health - damage);
+    // Apply damage - simple and direct
+    enemy.health -= damage;
+    if (enemy.health < 0) {
+        enemy.health = 0;
+    }
     enemy.isHit = true; // Trigger hit flash
     
-    // Debug: Log boss health changes
-    if (enemy.isBoss) {
-        const healthPercent = (enemy.health / enemy.maxHealth * 100).toFixed(1);
-        console.log(`Boss damaged! Health: ${enemy.health}/${enemy.maxHealth} (${healthPercent}%)`);
-    }
-    
-    // Lifesteal augment (simplified)
+    // Lifesteal augment
     if (activeAugments && activeAugments.length > 0) {
         for (let i = 0; i < activeAugments.length; i++) {
             if (activeAugments[i].type === 'lifesteal') {
@@ -4345,100 +4308,63 @@ function restartGame() {
 
 function updateHealthBars(scene, time) {
     enemies.children.entries.forEach(enemy => {
-        if (enemy.active && enemy.healthBar) {
-            // Update health bar position (bosses need more offset due to size)
-            const yOffset = enemy.isBoss ? -60 : -25;
-            enemy.healthBar.setPosition(enemy.x, enemy.y + yOffset);
+        if (!enemy.active || !enemy.healthBar || !enemy.healthBarFill) {
+            return;
+        }
+        
+        // Update health bar position
+        const yOffset = enemy.isBoss ? -60 : -25;
+        enemy.healthBar.setPosition(enemy.x, enemy.y + yOffset);
+        
+        // Update boss label position
+        if (enemy.isBoss && enemy.bossLabel) {
+            enemy.bossLabel.setPosition(enemy.x, enemy.y - 90);
+        }
+        
+        // Calculate health percentage - simple and direct
+        if (!enemy.maxHealth || enemy.maxHealth <= 0) {
+            return;
+        }
+        
+        const currentHealth = Math.max(0, enemy.health || 0);
+        const healthPercent = Math.max(0, Math.min(1, currentHealth / enemy.maxHealth));
+        
+        // Update health bar fill scale
+        if (enemy.isBoss) {
+            // Boss: scale by healthPercent (base scale is 3)
+            const baseScale = enemy.healthBarBaseScale || 3;
+            const bgHeightScale = 1.5;
+            const newScaleX = healthPercent * baseScale;
+            enemy.healthBarFill.setScale(newScaleX, bgHeightScale);
             
-            // Update boss label position too
-            if (enemy.isBoss && enemy.bossLabel) {
-                enemy.bossLabel.setPosition(enemy.x, enemy.y - 90);
+            // Reposition fill to stay left-aligned
+            if (enemy.healthBarBaseWidth) {
+                enemy.healthBarFill.x = -enemy.healthBarBaseWidth / 2;
             }
-            
-            // Update health bar fill width
-            if (!enemy.healthBarFill || !enemy.maxHealth || enemy.maxHealth <= 0) {
-                return;
+        } else {
+            // Regular enemy: scale is 1x
+            enemy.healthBarFill.setScale(healthPercent, 1);
+            enemy.healthBarFill.x = -15;
+        }
+        
+        // Change color based on health
+        if (healthPercent > 0.6) {
+            enemy.healthBarFill.setTint(0x00ff00); // Green
+        } else if (healthPercent > 0.3) {
+            enemy.healthBarFill.setTint(0xffff00); // Yellow
+        } else {
+            enemy.healthBarFill.setTint(0xff0000); // Red
+        }
+        
+        // Handle hit flash
+        if (enemy.isHit) {
+            if (!enemy.hitFlashStartTime) {
+                enemy.hitFlashStartTime = time;
             }
-            
-            // Ensure health is within valid range
-            const currentHealth = Math.max(0, Math.min(enemy.maxHealth, enemy.health || 0));
-            const healthPercent = Math.max(0, Math.min(1, currentHealth / enemy.maxHealth));
-            
-            // Boss health bars are scaled 3x wider, regular ones are 1x
-            if (enemy.isBoss) {
-                // Boss: scale by healthPercent (base scale is 3)
-                const baseScale = enemy.healthBarBaseScale || 3;
-                const bgHeightScale = 1.5;
-                const newScaleX = Math.max(0.01, healthPercent * baseScale); // Minimum scale to keep it visible
-                
-                // Debug: Log health bar update for boss
-                if (healthPercent < 0.7 && healthPercent > 0.6) {
-                    console.log(`Boss health bar update: ${(healthPercent * 100).toFixed(1)}% - Scale: ${newScaleX.toFixed(2)}, Fill exists: ${!!enemy.healthBarFill}, Fill active: ${enemy.healthBarFill?.active}`);
-                }
-                
-                // Ensure healthBarFill is still valid - check both the reference and if it's in the container
-                if (enemy.healthBarFill) {
-                    // If healthBarFill became inactive, reactivate it
-                    if (!enemy.healthBarFill.active) {
-                        console.warn('Boss health bar fill became inactive, reactivating!');
-                        enemy.healthBarFill.setActive(true);
-                    }
-                    if (!enemy.healthBarFill.visible) {
-                        console.warn('Boss health bar fill became invisible, making visible!');
-                        enemy.healthBarFill.setVisible(true);
-                    }
-                    
-                    // Always update the scale, even if it seems the same
-                    enemy.healthBarFill.setScale(newScaleX, bgHeightScale);
-                    
-                    // Reposition fill to stay left-aligned (x position stays constant)
-                    if (enemy.healthBarBaseWidth) {
-                        enemy.healthBarFill.x = -enemy.healthBarBaseWidth / 2;
-                    }
-                } else {
-                    // Health bar fill reference was lost - try to recover it from the container
-                    console.warn('Boss health bar fill reference lost, attempting recovery!');
-                    if (enemy.healthBar && enemy.healthBar.list) {
-                        const fill = enemy.healthBar.list.find(child => child !== enemy.healthBar.list[0]); // First is bg, second is fill
-                        if (fill) {
-                            enemy.healthBarFill = fill;
-                            enemy.healthBarFill.setScale(newScaleX, bgHeightScale);
-                            if (enemy.healthBarBaseWidth) {
-                                enemy.healthBarFill.x = -enemy.healthBarBaseWidth / 2;
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Regular enemy: scale is 1x
-                const newScale = Math.max(0.01, healthPercent); // Minimum scale to keep it visible
-                if (enemy.healthBarFill && enemy.healthBarFill.active) {
-                    enemy.healthBarFill.setScale(newScale, 1);
-                    enemy.healthBarFill.setVisible(true);
-                    // Reposition fill to stay left-aligned (base width is 30, so -15)
-                    enemy.healthBarFill.x = -15;
-                }
-            }
-            
-            // Change color based on health
-            if (healthPercent > 0.6) {
-                enemy.healthBarFill.setTint(0x00ff00); // Green
-            } else if (healthPercent > 0.3) {
-                enemy.healthBarFill.setTint(0xffff00); // Yellow
-            } else {
-                enemy.healthBarFill.setTint(0xff0000); // Red
-            }
-            
-            // Handle hit flash
-            if (enemy.isHit) {
-                if (!enemy.hitFlashStartTime) {
-                    enemy.hitFlashStartTime = time;
-                }
-                if (time - enemy.hitFlashStartTime > 100) {
-                    enemy.clearTint();
-                    enemy.isHit = false;
-                    enemy.hitFlashStartTime = null;
-                }
+            if (time - enemy.hitFlashStartTime > 100) {
+                enemy.clearTint();
+                enemy.isHit = false;
+                enemy.hitFlashStartTime = null;
             }
         }
     });
@@ -4687,25 +4613,16 @@ function updateBossBehavior(boss, time) {
         boss.bossPhase = 3;
         boss.speed = Math.min(200, boss.speed * 1.3);
         boss.shootCooldown = Math.max(200, boss.shootCooldown * 0.5);
-        // Ensure body stays enabled during phase change
         if (boss.body) {
             boss.body.enable = true;
         }
     } else if (healthPercent < 0.6 && boss.bossPhase < 2) {
-        console.log(`Boss entering Phase 2 at ${(healthPercent * 100).toFixed(1)}% health`);
         boss.bossPhase = 2;
         boss.speed = Math.min(150, boss.speed * 1.2);
         boss.shootCooldown = Math.max(300, boss.shootCooldown * 0.7);
-        // Ensure body stays enabled during phase change
         if (boss.body) {
             boss.body.enable = true;
-            console.log('Boss body enabled during phase 2 transition');
-        } else {
-            console.error('Boss has no body during phase 2 transition!');
         }
-        // Ensure boss never gets shield
-        boss.hasShield = false;
-        boss.shieldActive = false;
     }
     
     // Cycle through attack and movement patterns every 3 seconds
