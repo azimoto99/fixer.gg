@@ -2784,6 +2784,12 @@ function spawnBoss(scene, room) {
     boss.setDepth(10);
     boss.setTint(0xff0000); // Red boss
     
+    // Ensure boss has proper collision body for scaled sprite
+    boss.setCollideWorldBounds(true);
+    if (boss.body) {
+        boss.body.setSize(boss.width * 0.8, boss.height * 0.8); // Slightly smaller than visual for better feel
+    }
+    
     boss.type = 'boss';
     boss.health = 150 + (currentFloor * 30);
     boss.maxHealth = boss.health;
@@ -3310,8 +3316,13 @@ function hitEnemy(bullet, enemy) {
     }
     
     // Apply damage
-    enemy.health -= damage;
+    enemy.health = Math.max(0, enemy.health - damage);
     enemy.isHit = true; // Trigger hit flash
+    
+    // Debug: Log boss damage (remove in production)
+    if (enemy.isBoss) {
+        console.log(`Boss hit! Health: ${enemy.health}/${enemy.maxHealth}, Damage: ${damage}`);
+    }
     
     // Lifesteal augment (simplified)
     if (activeAugments && activeAugments.length > 0) {
@@ -4282,15 +4293,17 @@ function updateHealthBars(scene, time) {
             }
             
             // Update health bar fill width
-            if (!enemy.healthBarFill || !enemy.maxHealth) return;
+            if (!enemy.healthBarFill || !enemy.maxHealth || enemy.maxHealth <= 0) return;
             
-            const healthPercent = Math.max(0, Math.min(1, enemy.health / enemy.maxHealth));
+            // Ensure health is within valid range
+            const currentHealth = Math.max(0, Math.min(enemy.maxHealth, enemy.health || 0));
+            const healthPercent = currentHealth / enemy.maxHealth;
             
             // Boss health bars are scaled 3x wider, regular ones are 1x
             if (enemy.isBoss) {
                 // Boss: scale by healthPercent (base scale is 3)
                 const baseScale = enemy.healthBarBaseScale || 3;
-                const newScaleX = healthPercent * baseScale;
+                const newScaleX = Math.max(0, healthPercent * baseScale);
                 enemy.healthBarFill.setScale(newScaleX, 1.5);
                 // Reposition fill to stay left-aligned (x position stays constant)
                 if (enemy.healthBarBaseWidth) {
@@ -4298,7 +4311,7 @@ function updateHealthBars(scene, time) {
                 }
             } else {
                 // Regular enemy: scale is 1x
-                enemy.healthBarFill.setScale(healthPercent, 1);
+                enemy.healthBarFill.setScale(Math.max(0, healthPercent), 1);
                 // Reposition fill to stay left-aligned (base width is 30, so -15)
                 enemy.healthBarFill.x = -15;
             }
