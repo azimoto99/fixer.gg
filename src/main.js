@@ -2955,18 +2955,14 @@ function showAugmentSelection() {
         return;
     }
     
-    // Create overlay
-    augmentSelectionOverlay = gameScene.add.container(400, 300);
-    augmentSelectionOverlay.setDepth(400);
-    augmentSelectionOverlay.setScrollFactor(0);
-    
-    // Background - make it non-interactive so clicks pass through to buttons
-    const bg = gameScene.add.rectangle(0, 0, 800, 600, 0x000000, 0.95);
-    bg.setInteractive(); // Make background interactive to block clicks behind it
-    augmentSelectionOverlay.add(bg);
+    // Create overlay elements directly on scene (not in container) for proper input handling
+    // Background
+    const bg = gameScene.add.rectangle(400, 300, 800, 600, 0x000000, 0.95);
+    bg.setDepth(400);
+    bg.setScrollFactor(0);
     
     // Title
-    const title = gameScene.add.text(0, -250, `FLOOR ${currentFloor} CLEARED!\nChoose an Augment:`, {
+    const title = gameScene.add.text(400, 50, `FLOOR ${currentFloor} CLEARED!\nChoose an Augment:`, {
         fontSize: '32px',
         fill: '#00ffff',
         fontFamily: 'Courier New',
@@ -2976,31 +2972,35 @@ function showAugmentSelection() {
         align: 'center'
     });
     title.setOrigin(0.5);
-    augmentSelectionOverlay.add(title);
+    title.setDepth(401);
+    title.setScrollFactor(0);
     
-    // Create augment buttons
+    // Create augment buttons directly on scene
     augmentButtons = [];
     const buttonSpacing = 250;
-    const startX = -(buttonSpacing * (availableAugments.length - 1)) / 2;
+    const startX = 400 - (buttonSpacing * (availableAugments.length - 1)) / 2;
+    const buttonY = 300;
     
     availableAugments.forEach((augment, index) => {
         const buttonX = startX + index * buttonSpacing;
         
-        // Button background
-        const buttonBg = gameScene.add.rectangle(buttonX, 0, 200, 300, 0x1a1a1a);
+        // Button background - add directly to scene
+        const buttonBg = gameScene.add.rectangle(buttonX, buttonY, 200, 300, 0x1a1a1a);
         buttonBg.setStrokeStyle(3, getRarityColor(augment.rarity), 1);
         buttonBg.setInteractive({ useHandCursor: true });
-        augmentSelectionOverlay.add(buttonBg);
+        buttonBg.setDepth(401);
+        buttonBg.setScrollFactor(0);
         
         // Augment icon
-        const icon = gameScene.add.text(buttonX, -100, augment.icon, {
+        const icon = gameScene.add.text(buttonX, buttonY - 100, augment.icon, {
             fontSize: '64px'
         });
         icon.setOrigin(0.5);
-        augmentSelectionOverlay.add(icon);
+        icon.setDepth(402);
+        icon.setScrollFactor(0);
         
         // Augment name
-        const nameText = gameScene.add.text(buttonX, -20, augment.name, {
+        const nameText = gameScene.add.text(buttonX, buttonY - 20, augment.name, {
             fontSize: '20px',
             fill: '#00ffff',
             fontFamily: 'Courier New',
@@ -3009,10 +3009,11 @@ function showAugmentSelection() {
             wordWrap: { width: 180 }
         });
         nameText.setOrigin(0.5);
-        augmentSelectionOverlay.add(nameText);
+        nameText.setDepth(402);
+        nameText.setScrollFactor(0);
         
         // Augment description
-        const descText = gameScene.add.text(buttonX, 40, augment.description, {
+        const descText = gameScene.add.text(buttonX, buttonY + 40, augment.description, {
             fontSize: '14px',
             fill: '#ffffff',
             fontFamily: 'Courier New',
@@ -3020,17 +3021,19 @@ function showAugmentSelection() {
             wordWrap: { width: 180 }
         });
         descText.setOrigin(0.5);
-        augmentSelectionOverlay.add(descText);
+        descText.setDepth(402);
+        descText.setScrollFactor(0);
         
         // Rarity indicator
-        const rarityText = gameScene.add.text(buttonX, 120, augment.rarity.toUpperCase(), {
+        const rarityText = gameScene.add.text(buttonX, buttonY + 120, augment.rarity.toUpperCase(), {
             fontSize: '12px',
             fill: getRarityColor(augment.rarity),
             fontFamily: 'Courier New',
             fontStyle: 'bold'
         });
         rarityText.setOrigin(0.5);
-        augmentSelectionOverlay.add(rarityText);
+        rarityText.setDepth(402);
+        rarityText.setScrollFactor(0);
         
         // Button hover effects
         buttonBg.on('pointerover', () => {
@@ -3046,14 +3049,22 @@ function showAugmentSelection() {
             selectAugment(augment);
         });
         
-        // Also make text elements non-interactive so clicks go to button
-        icon.setInteractive(false);
-        nameText.setInteractive(false);
-        descText.setInteractive(false);
-        rarityText.setInteractive(false);
-        
-        augmentButtons.push({ bg: buttonBg, augment: augment });
+        augmentButtons.push({ 
+            bg: buttonBg, 
+            icon: icon,
+            nameText: nameText,
+            descText: descText,
+            rarityText: rarityText,
+            augment: augment 
+        });
     });
+    
+    // Store overlay elements for cleanup
+    augmentSelectionOverlay = {
+        bg: bg,
+        title: title,
+        buttons: augmentButtons
+    };
 }
 
 // Get rarity color
