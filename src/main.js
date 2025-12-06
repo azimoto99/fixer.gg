@@ -3348,6 +3348,12 @@ function hitEnemy(bullet, enemy) {
     enemy.health = Math.max(0, enemy.health - damage);
     enemy.isHit = true; // Trigger hit flash
     
+    // Debug: Log boss health changes
+    if (enemy.isBoss) {
+        const healthPercent = (enemy.health / enemy.maxHealth * 100).toFixed(1);
+        console.log(`Boss damaged! Health: ${enemy.health}/${enemy.maxHealth} (${healthPercent}%)`);
+    }
+    
     // Lifesteal augment (simplified)
     if (activeAugments && activeAugments.length > 0) {
         for (let i = 0; i < activeAugments.length; i++) {
@@ -4317,27 +4323,68 @@ function updateHealthBars(scene, time) {
             }
             
             // Update health bar fill width
-            if (!enemy.healthBarFill || !enemy.maxHealth || enemy.maxHealth <= 0) return;
+            if (!enemy.healthBarFill || !enemy.maxHealth || enemy.maxHealth <= 0) {
+                return;
+            }
             
             // Ensure health is within valid range
             const currentHealth = Math.max(0, Math.min(enemy.maxHealth, enemy.health || 0));
-            const healthPercent = currentHealth / enemy.maxHealth;
+            const healthPercent = Math.max(0, Math.min(1, currentHealth / enemy.maxHealth));
             
             // Boss health bars are scaled 3x wider, regular ones are 1x
             if (enemy.isBoss) {
                 // Boss: scale by healthPercent (base scale is 3)
                 const baseScale = enemy.healthBarBaseScale || 3;
-                const newScaleX = Math.max(0, healthPercent * baseScale);
-                enemy.healthBarFill.setScale(newScaleX, 1.5);
-                // Reposition fill to stay left-aligned (x position stays constant)
-                if (enemy.healthBarBaseWidth) {
-                    enemy.healthBarFill.x = -enemy.healthBarBaseWidth / 2;
+                const bgHeightScale = 1.5;
+                const newScaleX = Math.max(0.01, healthPercent * baseScale); // Minimum scale to keep it visible
+                
+                // Debug: Log health bar update for boss
+                if (healthPercent < 0.7 && healthPercent > 0.6) {
+                    console.log(`Boss health bar update: ${(healthPercent * 100).toFixed(1)}% - Scale: ${newScaleX.toFixed(2)}, Fill exists: ${!!enemy.healthBarFill}, Fill active: ${enemy.healthBarFill?.active}`);
+                }
+                
+                // Ensure healthBarFill is still valid - check both the reference and if it's in the container
+                if (enemy.healthBarFill) {
+                    // If healthBarFill became inactive, reactivate it
+                    if (!enemy.healthBarFill.active) {
+                        console.warn('Boss health bar fill became inactive, reactivating!');
+                        enemy.healthBarFill.setActive(true);
+                    }
+                    if (!enemy.healthBarFill.visible) {
+                        console.warn('Boss health bar fill became invisible, making visible!');
+                        enemy.healthBarFill.setVisible(true);
+                    }
+                    
+                    // Always update the scale, even if it seems the same
+                    enemy.healthBarFill.setScale(newScaleX, bgHeightScale);
+                    
+                    // Reposition fill to stay left-aligned (x position stays constant)
+                    if (enemy.healthBarBaseWidth) {
+                        enemy.healthBarFill.x = -enemy.healthBarBaseWidth / 2;
+                    }
+                } else {
+                    // Health bar fill reference was lost - try to recover it from the container
+                    console.warn('Boss health bar fill reference lost, attempting recovery!');
+                    if (enemy.healthBar && enemy.healthBar.list) {
+                        const fill = enemy.healthBar.list.find(child => child !== enemy.healthBar.list[0]); // First is bg, second is fill
+                        if (fill) {
+                            enemy.healthBarFill = fill;
+                            enemy.healthBarFill.setScale(newScaleX, bgHeightScale);
+                            if (enemy.healthBarBaseWidth) {
+                                enemy.healthBarFill.x = -enemy.healthBarBaseWidth / 2;
+                            }
+                        }
+                    }
                 }
             } else {
                 // Regular enemy: scale is 1x
-                enemy.healthBarFill.setScale(Math.max(0, healthPercent), 1);
-                // Reposition fill to stay left-aligned (base width is 30, so -15)
-                enemy.healthBarFill.x = -15;
+                const newScale = Math.max(0.01, healthPercent); // Minimum scale to keep it visible
+                if (enemy.healthBarFill && enemy.healthBarFill.active) {
+                    enemy.healthBarFill.setScale(newScale, 1);
+                    enemy.healthBarFill.setVisible(true);
+                    // Reposition fill to stay left-aligned (base width is 30, so -15)
+                    enemy.healthBarFill.x = -15;
+                }
             }
             
             // Change color based on health
