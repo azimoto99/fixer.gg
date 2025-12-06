@@ -864,6 +864,11 @@ class GameScene extends Phaser.Scene {
         
         // Collision detection: bullets vs walls
         this.physics.add.collider(bullets, allWalls, (bullet) => {
+            cleanupBulletTrail(bullet);
+            if (bullet.hitEnemies) {
+                bullet.hitEnemies.clear();
+                bullet.hitEnemies = null;
+            }
             bullets.killAndHide(bullet);
         });
         
@@ -874,6 +879,11 @@ class GameScene extends Phaser.Scene {
         
         // Collision detection: bullets vs obstacles
         this.physics.add.collider(bullets, allObstacles, (bullet) => {
+            cleanupBulletTrail(bullet);
+            if (bullet.hitEnemies) {
+                bullet.hitEnemies.clear();
+                bullet.hitEnemies = null;
+            }
             bullets.killAndHide(bullet);
         });
         
@@ -1051,6 +1061,11 @@ class GameScene extends Phaser.Scene {
                     if (bullet.x < bounds.x || bullet.x > bounds.width ||
                         bullet.y < bounds.y || bullet.y > bounds.height) {
                         cleanupBulletTrail(bullet);
+                        // Clear hit tracking before killing bullet
+                        if (bullet.hitEnemies) {
+                            bullet.hitEnemies.clear();
+                            bullet.hitEnemies = null;
+                        }
                         bullets.killAndHide(bullet);
                     }
                 }
@@ -1276,9 +1291,10 @@ function shoot(scene, time) {
                 bullet.setScale(1);
                 bullet.damage = Math.floor(currentWeapon.damage * damageMultiplier);
                 bullet.setTint(currentWeapon.color);
-                // Always create fresh Set to prevent reuse issues
+                // Always create fresh Set - clear any old references
                 if (bullet.hitEnemies) {
                     bullet.hitEnemies.clear();
+                    bullet.hitEnemies = null;
                 }
                 bullet.hitEnemies = new Set(); // Track which enemies this bullet has hit
                 bullet.piercing = false; // Shotgun doesn't pierce by default
@@ -1313,9 +1329,10 @@ function shoot(scene, time) {
             bullet.setActive(true);
             bullet.setVisible(true);
             
-            // Initialize bullet properties - always create fresh Set to prevent reuse issues
+            // Always create fresh Set - clear any old references
             if (bullet.hitEnemies) {
                 bullet.hitEnemies.clear();
+                bullet.hitEnemies = null;
             }
             bullet.hitEnemies = new Set(); // Track which enemies this bullet has hit
             
@@ -1611,6 +1628,13 @@ function shoot(scene, time) {
     bullet.setActive(true);
     bullet.setVisible(true);
     bullet.setScale(1);
+    
+    // Always create fresh Set - clear any old references
+    if (bullet.hitEnemies) {
+        bullet.hitEnemies.clear();
+        bullet.hitEnemies = null;
+    }
+    bullet.hitEnemies = new Set();
     
     // Calculate direction to mouse
     const angle = Phaser.Math.Angle.Between(
@@ -3372,6 +3396,11 @@ function hitEnemy(bullet, enemy) {
             bullet.trail.destroy();
             bullet.trail = null;
         }
+        // Clear hit tracking before killing bullet
+        if (bullet.hitEnemies) {
+            bullet.hitEnemies.clear();
+            bullet.hitEnemies = null;
+        }
         bullets.killAndHide(bullet);
     }
     
@@ -4617,21 +4646,6 @@ function addBulletTrail(bullet) {
     const startY = bullet.y - Math.sin(angle) * trailLength;
     bullet.trail.lineTo(startX, startY);
     bullet.trail.strokePath();
-}
-
-function cleanupBulletTrail(bullet) {
-    if (!bullet) return;
-    
-    if (bullet.trail) {
-        bullet.trail.destroy();
-        bullet.trail = null;
-    }
-    
-    // Clean up hit tracking
-    if (bullet.hitEnemies) {
-        bullet.hitEnemies.clear();
-        bullet.hitEnemies = null;
-    }
 }
 
 // ========== GAME INITIALIZATION ==========
