@@ -1276,6 +1276,10 @@ function shoot(scene, time) {
                 bullet.setScale(1);
                 bullet.damage = Math.floor(currentWeapon.damage * damageMultiplier);
                 bullet.setTint(currentWeapon.color);
+                // Always create fresh Set to prevent reuse issues
+                if (bullet.hitEnemies) {
+                    bullet.hitEnemies.clear();
+                }
                 bullet.hitEnemies = new Set(); // Track which enemies this bullet has hit
                 bullet.piercing = false; // Shotgun doesn't pierce by default
                 
@@ -1309,7 +1313,10 @@ function shoot(scene, time) {
             bullet.setActive(true);
             bullet.setVisible(true);
             
-            // Initialize bullet properties
+            // Initialize bullet properties - always create fresh Set to prevent reuse issues
+            if (bullet.hitEnemies) {
+                bullet.hitEnemies.clear();
+            }
             bullet.hitEnemies = new Set(); // Track which enemies this bullet has hit
             
             // Check for bullet size augment
@@ -2786,9 +2793,22 @@ function spawnBoss(scene, room) {
     
     // Ensure boss has proper collision body for scaled sprite
     boss.setCollideWorldBounds(true);
-    if (boss.body) {
-        boss.body.setSize(boss.width * 0.8, boss.height * 0.8); // Slightly smaller than visual for better feel
-    }
+    // Set body size after sprite is fully initialized
+    // Use a callback to ensure sprite dimensions are available
+    scene.time.delayedCall(10, () => {
+        if (boss && boss.body && boss.active) {
+            // Get display dimensions (accounts for scale)
+            const displayWidth = boss.displayWidth || (boss.width * boss.scaleX);
+            const displayHeight = boss.displayHeight || (boss.height * boss.scaleY);
+            const bodyWidth = displayWidth * 0.8;
+            const bodyHeight = displayHeight * 0.8;
+            boss.body.setSize(bodyWidth, bodyHeight);
+            // Center the body offset
+            boss.body.setOffset((displayWidth - bodyWidth) / 2, (displayHeight - bodyHeight) / 2);
+            // Ensure body is enabled
+            boss.body.enable = true;
+        }
+    }, [], scene);
     
     boss.type = 'boss';
     boss.health = 150 + (currentFloor * 30);
@@ -3296,14 +3316,23 @@ function hitEnemy(bullet, enemy) {
         return;
     }
     
+    // Additional check for boss - ensure body exists and is active
+    if (enemy.isBoss && (!enemy.body || !enemy.body.enable)) {
+        return;
+    }
+    
     // Prevent multiple hits from same bullet
-    if (bullet.hitEnemies) {
-        if (bullet.hitEnemies.has(enemy)) {
-            return;
-        }
-    } else {
+    // Always ensure hitEnemies Set exists and is valid
+    if (!bullet.hitEnemies) {
         bullet.hitEnemies = new Set();
     }
+    
+    // Check if this bullet has already hit this enemy
+    if (bullet.hitEnemies.has(enemy)) {
+        return;
+    }
+    
+    // Mark this enemy as hit by this bullet
     bullet.hitEnemies.add(enemy);
     
     // Get damage value
@@ -3318,11 +3347,6 @@ function hitEnemy(bullet, enemy) {
     // Apply damage
     enemy.health = Math.max(0, enemy.health - damage);
     enemy.isHit = true; // Trigger hit flash
-    
-    // Debug: Log boss damage (remove in production)
-    if (enemy.isBoss) {
-        console.log(`Boss hit! Health: ${enemy.health}/${enemy.maxHealth}, Damage: ${damage}`);
-    }
     
     // Lifesteal augment (simplified)
     if (activeAugments && activeAugments.length > 0) {
