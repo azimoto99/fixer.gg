@@ -1,0 +1,25 @@
+{
+  "name": "cyberpunk-roguelike",
+  "version": "1.0.0",
+  "description": "Nuclear Throne style cyberpunk roguelike for fixer.gg",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx http-server . -p 8080 -o",
+    "start": "npx http-server . -p 8080 -o"
+  },
+  "keywords": [
+    "game",
+    "roguelike",
+    "phaser",
+    "cyberpunk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
+
