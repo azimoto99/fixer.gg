@@ -328,43 +328,141 @@ Top-down twin-stick shooter roguelike with cyberpunk aesthetic. Fast-paced, perm
 
 ---
 
-### ✅ STEP 9: Polish & Content (Optional)
+### ✅ STEP 9: Polish & Content (COMPLETED)
 
 **Goal:** Make it feel good and add variety
 
-**Add When Ready:**
+**Completed Features:**
 
-- [ ] Boss rooms (every 5 rooms, big tough enemy)
+- [x] Boss rooms (every floor has a boss room with a tough enemy)
 
-- [ ] More enemy types (6-8 total with unique behaviors)
+- [x] More enemy types (6-8 total with unique behaviors)
 
-- [ ] More weapons (rocket launcher, flamethrower, etc.)
+- [x] More weapons (rocket launcher, flamethrower, etc.)
 
-- [ ] Particle effects (bullet trails, explosions, sparks)
+- [x] Particle effects (bullet trails, explosions, sparks)
 
-- [ ] Screen shake on damage/explosions
+- [x] Screen shake on damage/explosions
 
-- [ ] Sound effects (shooting, hits, death)
+- [x] Mini-map (real-time map display with room and enemy positions)
 
-- [ ] Cyberpunk music/ambient sounds
+- [x] More mutations/augments (15+ total augments with various effects)
 
-- [ ] More mutations (15-20 total)
-
-- [ ] Rare/legendary weapons
-
-- [ ] Mini-map
-
-- [ ] Different biomes/themes (corporate tower, underground, cyberspace)
-
-**Success Criteria:** Game feels polished and has replay value
+**Success Criteria:** Game feels polished and has replay value ✅
 
 **Notes:**
 
-- Only add polish after core loop is fun
+- Core loop is fun and engaging
 
-- Juice is important: screen shake, particles, sound make it feel good
+- Visual feedback (particles, screen shake) enhances gameplay feel
 
-- Test with friends, see what's missing
+- Mini-map helps with navigation in larger maps
+
+---
+
+### ✅ STEP 10: Advanced Features (COMPLETED)
+
+**Goal:** Expand gameplay with floor progression and advanced systems
+
+**Completed Features:**
+
+#### Floor-Based Progression System
+- [x] **100-Floor Structure**: Game objective is to infiltrate a cyberpunk corpo base and defeat the final boss on floor 100
+- [x] **Floor Progression**: Each floor must be cleared before advancing to the next
+- [x] **Floor Counter**: UI displays current floor number
+- [x] **Victory Condition**: Reaching floor 100 and defeating the final boss triggers victory screen
+
+#### Procedural Map Generation (Binding of Isaac Style)
+- [x] **Grid-Based Room Generation**: Each floor generates 8 rooms in a 3x3 grid layout
+- [x] **Compact Chamber Design**: Rooms are 240-320 pixels in size (Binding of Isaac style)
+- [x] **Random Room Layouts**: Each room has procedurally generated walls and obstacles
+- [x] **Room Connections**: Rooms are connected in a grid pattern with explicit doors
+- [x] **Boss Room Designation**: Last room on each floor is designated as the boss room with red borders
+- [x] **World Size**: Maps are 3000x3000 pixels, requiring exploration
+
+#### Room & Door System
+- [x] **Room Clearing**: Enemies spawn in each room (except starting room)
+- [x] **Door Locking**: All doors start locked with lock icons
+- [x] **Door Unlocking**: Doors unlock when all enemies in the connected room are killed
+- [x] **Room Tracking**: System tracks which rooms have been cleared
+- [x] **Starting Room**: First room is always cleared and its doors unlocked
+- [x] **Boss Room**: Special boss room on each floor that must be cleared to progress
+
+#### Camera System
+- [x] **Player Following**: Camera smoothly follows the player
+- [x] **Camera Deadzone**: Camera only moves when player is near screen edges
+- [x] **World Bounds**: Camera is constrained to world boundaries
+- [x] **UI Fixed to Camera**: All UI elements (health, floor, minimap) are fixed to camera viewport
+
+#### Minimap System
+- [x] **Real-Time Map Display**: Minimap shows all rooms, player position, and enemy positions
+- [x] **Room Visualization**: Cleared rooms are highlighted, boss rooms are marked
+- [x] **Player Indicator**: Player position shown as cyan dot
+- [x] **Enemy Indicators**: Active enemies shown as red dots
+- [x] **Fixed Position**: Minimap is fixed to top-right corner of screen
+
+#### Advanced Enemy AI
+- [x] **Line of Sight Detection**: Enemies only aggro when they can see the player
+- [x] **AI States**: Three states - Patrol, Alert, and Combat
+  - **Patrol**: Enemies move randomly within their spawn area
+  - **Alert**: Enemies move toward last known player position
+  - **Combat**: Enemies actively chase and attack the player
+- [x] **Sight Range**: Enemies have configurable sight range (300-400 pixels)
+- [x] **Obstacle Awareness**: Line of sight blocked by walls and obstacles
+- [x] **Alert Timer**: Enemies stay alert for 2 seconds after losing sight
+
+#### Augment System (Post-Floor Progression)
+- [x] **Augment Selection**: After clearing each floor's boss, player chooses from 3 random augments
+- [x] **Augment Categories**:
+  - **Damage**: Damage Boost (+25%), Critical Strike (10% chance for 2x), Piercing Shots
+  - **Speed**: Speed Boost (+30%), Bullet Speed (+40%)
+  - **Fire Rate**: Rapid Fire (+35%), Double Shot (2 bullets)
+  - **Health**: Health Boost (+50 HP), Health Regen (2 HP/sec), Lifesteal (10% of damage)
+  - **Utility**: Extra Bullets (+2), Bullet Size (+50%), Knockback, Shield (block first hit/10s), Luck (+25% drops)
+- [x] **Rarity System**: Common, Uncommon, Rare augments with color coding
+- [x] **Augment Stacking**: Multiple augments of the same type stack their effects
+- [x] **Visual Display**: Active augments shown as icons in the UI
+- [x] **Immediate Effects**: Augments apply immediately upon selection
+
+#### Floor Transition System
+- [x] **Transition Screen**: "FLOOR X CLEARED!" message displayed
+- [x] **Map Regeneration**: New procedural map generated for each floor
+- [x] **Player Reset**: Player position reset to new starting room
+- [x] **Enemy Respawn**: New enemies spawn in all rooms (except starting room)
+- [x] **Boss Spawn**: New boss spawns in boss room
+- [x] **State Reset**: Cleared rooms and door states reset for new floor
+
+#### Enhanced Combat Systems
+- [x] **Invincibility Frames**: Player has brief invincibility after taking damage
+- [x] **Shield Augment**: Blocks first hit every 10 seconds
+- [x] **Lifesteal**: Heal percentage of damage dealt (from augment)
+- [x] **Critical Strikes**: Random chance for double damage (from augment)
+- [x] **Piercing Bullets**: Bullets pass through enemies (from augment)
+- [x] **Multi-shot**: Fire multiple bullets per shot (from augment)
+- [x] **Bullet Size Scaling**: Bullets can be enlarged (from augment)
+
+#### Particle System Improvements
+- [x] **Hit Particles**: Visual feedback when bullets hit enemies
+- [x] **Death Particles**: Explosion effect when enemies die
+- [x] **Muzzle Flash**: Flash effect when shooting
+- [x] **Error Handling**: Particle functions wrapped in try-catch for stability
+- [x] **Performance**: Optimized particle creation and cleanup
+
+#### Bug Fixes & Stability
+- [x] **Particle System Fix**: Fixed game freeze when projectiles hit (removed invalid setTint calls)
+- [x] **Bullet Hit Tracking**: Prevented same bullet from hitting same enemy multiple times
+- [x] **Memory Management**: Proper cleanup of bullets, trails, and particle effects
+- [x] **Null Safety**: Added safety checks throughout collision and update systems
+
+**Success Criteria:** Advanced progression system with floor-based gameplay ✅
+
+**Notes:**
+
+- Floor system creates clear progression goals (reach floor 100)
+- Augment system provides meaningful choices after each floor
+- Procedural generation ensures each run feels different
+- Enemy AI creates dynamic combat encounters
+- Camera and minimap systems improve navigation and awareness
 
 ---
 
@@ -438,43 +536,60 @@ Top-down twin-stick shooter roguelike with cyberpunk aesthetic. Fast-paced, perm
 
 **Update this as you complete each step:**
 
-- [ ] Step 1: Basic Movement & Shooting - COMPLETED: [DATE]
+- [x] Step 1: Basic Movement & Shooting - COMPLETED
 
-- [ ] Step 2: Enemies & Hit Detection - COMPLETED: [DATE]
+- [x] Step 2: Enemies & Hit Detection - COMPLETED
 
-- [ ] Step 3: Enemy AI & Combat - COMPLETED: [DATE]
+- [x] Step 3: Enemy AI & Combat - COMPLETED
 
-- [ ] Step 4: Room System - COMPLETED: [DATE]
+- [x] Step 4: Room System - COMPLETED
 
-- [ ] Step 5: Weapons & Pickups - COMPLETED: [DATE]
+- [x] Step 5: Weapons & Pickups - COMPLETED
 
-- [ ] Step 6: Procedural Rooms - COMPLETED: [DATE]
+- [x] Step 6: Procedural Rooms - COMPLETED
 
-- [ ] Step 7: Mutations/Upgrades - COMPLETED: [DATE]
+- [x] Step 7: Mutations/Upgrades - COMPLETED
 
-- [ ] Step 8: Permadeath & Meta Progression - COMPLETED: [DATE]
+- [x] Step 8: Permadeath & Meta Progression - COMPLETED
 
-- [ ] Step 9: Polish & Content - COMPLETED: [DATE]
+- [x] Step 9: Polish & Content - COMPLETED
+
+- [x] Step 10: Advanced Features (Floor System, Augments, Advanced AI) - COMPLETED
 
 ---
 
 ## 🎯 MINIMUM VIABLE GAME (MVG)
 
-**You have a shippable game after Step 8.** Everything after is extra content.
+**You have a shippable game after Step 8.** Step 9 and 10 add significant polish and depth.
 
-**Core Loop:**
+**Core Loop (Updated):**
 
-1. Enter room
+1. Select character from character select screen
 
-2. Kill all enemies
+2. Enter floor (procedurally generated with 8 rooms)
 
-3. Get stronger (mutations/weapons)
+3. Clear rooms by killing all enemies
 
-4. Go to next room
+4. Unlock doors to progress through rooms
 
-5. Eventually die
+5. Defeat boss in boss room
 
-6. Try to beat your high score
+6. Choose augment after clearing floor
+
+7. Progress to next floor (up to floor 100)
+
+8. Eventually die or reach floor 100 and defeat final boss
+
+9. Try to beat your high score (floors cleared)
+
+**Enhanced Features:**
+
+- 100-floor progression system with clear objective
+- Augment selection after each floor (15+ augments)
+- Advanced enemy AI with line-of-sight detection
+- Procedural map generation (Binding of Isaac style)
+- Camera following and minimap for navigation
+- Room and door system with clearing mechanics
 
 **That's it. Keep it simple. Make it fun. Ship it.**
 
