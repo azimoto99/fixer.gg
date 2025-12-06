@@ -174,7 +174,7 @@ let mutationsDisplay;
 let floorText;
 let basePlayerSpeed = 200;
 let baseBulletDamage = 7;
-let baseFireRate = 150;
+let baseFireRate = 200; // 75% of original 150ms = 200ms (slower fire rate)
 let baseBulletSpeed = 600;
 let healthRegenTimer = 0;
 let weaponPickups;
@@ -2050,10 +2050,24 @@ function generateProceduralMap(numRooms = 8) {
         if (roomId >= numRooms) break;
     }
     
-    // Designate last room as boss room
-    if (rooms.length > 0) {
-        rooms[rooms.length - 1].isBossRoom = true;
-        bossRoomId = rooms[rooms.length - 1].id;
+    // Designate a random room (except first room) as boss room
+    // Reset all rooms first to ensure clean state
+    rooms.forEach(room => {
+        room.isBossRoom = false;
+    });
+    
+    if (rooms.length > 1) {
+        // Pick a random room index from 1 to rooms.length - 1 (skip first room)
+        // Use Math.random() for better randomization
+        const randomBossIndex = Math.floor(Math.random() * (rooms.length - 1)) + 1;
+        rooms[randomBossIndex].isBossRoom = true;
+        bossRoomId = rooms[randomBossIndex].id;
+        console.log(`Boss room selected: Room ${bossRoomId} (index ${randomBossIndex})`);
+    } else if (rooms.length === 1) {
+        // Fallback: if only one room, make it the boss room
+        rooms[0].isBossRoom = true;
+        bossRoomId = rooms[0].id;
+        console.log(`Boss room selected: Room ${bossRoomId} (only room)`);
     }
     
     // Create connections between adjacent rooms (grid-based)
@@ -3202,6 +3216,9 @@ function proceedToNextFloor() {
         player.glow.setPosition(firstRoom.centerX, firstRoom.centerY);
     }
     
+    // Pan camera to first room (Binding of Isaac style)
+    gameScene.cameras.main.pan(firstRoom.centerX, firstRoom.centerY, 500, 'Power2', false);
+    
     // Update UI
     if (floorText) {
         floorText.setText(`FLOOR ${currentFloor}/100`);
@@ -3621,6 +3638,11 @@ function checkLevelUp() {
 }
 
 function showLevelUpScreen() {
+    // Close any existing level up screen first
+    if (levelUpOverlay) {
+        closeLevelUpScreen();
+    }
+    
     isLevelUpScreen = true;
     
     // Stop player movement
@@ -3633,9 +3655,12 @@ function showLevelUpScreen() {
         enemy.setVelocity(0, 0);
     });
     
-    // Create overlay
-    const overlay = gameScene.add.rectangle(400, 300, 800, 600, 0x000000, 0.8);
-    overlay.setDepth(100);
+    // Create overlay - ensure it's on top
+    const overlay = gameScene.add.rectangle(400, 300, 800, 600, 0x000000, 0.9);
+    overlay.setDepth(500);
+    overlay.setScrollFactor(0);
+    overlay.setVisible(true);
+    overlay.setActive(true);
     
     // Level up text
     const levelUpText = gameScene.add.text(400, 150, 'LEVEL UP!', {
@@ -3646,7 +3671,10 @@ function showLevelUpScreen() {
         strokeThickness: 4
     });
     levelUpText.setOrigin(0.5);
-    levelUpText.setDepth(101);
+    levelUpText.setDepth(501);
+    levelUpText.setScrollFactor(0);
+    levelUpText.setVisible(true);
+    levelUpText.setActive(true);
     
     // Choose 3 random mutations
     const mutationKeys = Object.keys(mutations);
@@ -3673,7 +3701,10 @@ function showLevelUpScreen() {
         const button = gameScene.add.rectangle(400, yPos, 600, 80, 0x1a1a1a);
         button.setStrokeStyle(2, 0x00ffff, 1);
         button.setInteractive({ useHandCursor: true });
-        button.setDepth(101);
+        button.setDepth(501);
+        button.setScrollFactor(0);
+        button.setVisible(true);
+        button.setActive(true);
         button.mutationKey = mutationKey;
         
         // Mutation name
@@ -3684,7 +3715,10 @@ function showLevelUpScreen() {
             fontStyle: 'bold'
         });
         nameText.setOrigin(0.5);
-        nameText.setDepth(102);
+        nameText.setDepth(502);
+        nameText.setScrollFactor(0);
+        nameText.setVisible(true);
+        nameText.setActive(true);
         
         // Mutation description
         const descText = gameScene.add.text(400, yPos + 15, mutation.description, {
@@ -3693,7 +3727,10 @@ function showLevelUpScreen() {
             fontFamily: 'Courier New'
         });
         descText.setOrigin(0.5);
-        descText.setDepth(102);
+        descText.setDepth(502);
+        descText.setScrollFactor(0);
+        descText.setVisible(true);
+        descText.setActive(true);
         
         // Button hover effects
         button.on('pointerover', () => {
@@ -4501,7 +4538,7 @@ function restartGame() {
     activeMutations = [];
     basePlayerSpeed = 200;
     baseBulletDamage = 7;
-    baseFireRate = 150;
+    baseFireRate = 200; // 75% of original fire rate
     baseBulletSpeed = 600;
     totalEnemiesKilled = 0;
     gameStartTime = Date.now();
