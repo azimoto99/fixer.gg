@@ -2960,8 +2960,9 @@ function showAugmentSelection() {
     augmentSelectionOverlay.setDepth(400);
     augmentSelectionOverlay.setScrollFactor(0);
     
-    // Background
+    // Background - make it non-interactive so clicks pass through to buttons
     const bg = gameScene.add.rectangle(0, 0, 800, 600, 0x000000, 0.95);
+    bg.setInteractive(); // Make background interactive to block clicks behind it
     augmentSelectionOverlay.add(bg);
     
     // Title
@@ -3041,8 +3042,15 @@ function showAugmentSelection() {
             buttonBg.setScale(1);
         });
         buttonBg.on('pointerdown', () => {
+            console.log('Augment button clicked:', augment.name);
             selectAugment(augment);
         });
+        
+        // Also make text elements non-interactive so clicks go to button
+        icon.setInteractive(false);
+        nameText.setInteractive(false);
+        descText.setInteractive(false);
+        rarityText.setInteractive(false);
         
         augmentButtons.push({ bg: buttonBg, augment: augment });
     });
@@ -3105,12 +3113,34 @@ function applyAugment(augment) {
 // Close augment selection
 function closeAugmentSelection() {
     if (augmentSelectionOverlay) {
-        augmentSelectionOverlay.destroy();
+        // Destroy background
+        if (augmentSelectionOverlay.bg) {
+            augmentSelectionOverlay.bg.destroy();
+        }
+        // Destroy title
+        if (augmentSelectionOverlay.title) {
+            augmentSelectionOverlay.title.destroy();
+        }
+        // Destroy all button elements
+        if (augmentSelectionOverlay.buttons) {
+            augmentSelectionOverlay.buttons.forEach(btn => {
+                if (btn.bg) btn.bg.destroy();
+                if (btn.icon) btn.icon.destroy();
+                if (btn.nameText) btn.nameText.destroy();
+                if (btn.descText) btn.descText.destroy();
+                if (btn.rarityText) btn.rarityText.destroy();
+            });
+        }
         augmentSelectionOverlay = null;
     }
     augmentButtons = [];
     augmentSelectionActive = false;
     isLevelUpScreen = false;
+    
+    // Reset player velocity when closing augment selection
+    if (player && player.body) {
+        player.setVelocity(0, 0);
+    }
 }
 
 // Update augments display
