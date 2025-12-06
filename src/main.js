@@ -3316,6 +3316,9 @@ function spawnEnemies(scene, count) {
 function hitEnemy(bullet, enemy) {
     // Simple safety checks
     if (!bullet || !bullet.active || !enemy || !enemy.active) {
+        if (enemy && enemy.isBoss) {
+            console.log(`Boss hit blocked: bullet=${!!bullet}, bullet.active=${bullet?.active}, enemy=${!!enemy}, enemy.active=${enemy?.active}`);
+        }
         return;
     }
     
@@ -3324,6 +3327,9 @@ function hitEnemy(bullet, enemy) {
         bullet.hitEnemies = new Set();
     }
     if (bullet.hitEnemies.has(enemy)) {
+        if (enemy.isBoss) {
+            console.log(`Boss hit blocked: bullet already hit this enemy`);
+        }
         return;
     }
     bullet.hitEnemies.add(enemy);
@@ -3338,11 +3344,18 @@ function hitEnemy(bullet, enemy) {
     }
     
     // Apply damage - simple and direct
+    const oldHealth = enemy.health;
     enemy.health -= damage;
     if (enemy.health < 0) {
         enemy.health = 0;
     }
     enemy.isHit = true; // Trigger hit flash
+    
+    // Debug for boss
+    if (enemy.isBoss) {
+        const healthPercent = (enemy.health / enemy.maxHealth * 100).toFixed(1);
+        console.log(`Boss hit! ${oldHealth} -> ${enemy.health} (${healthPercent}%)`);
+    }
     
     // Lifesteal augment
     if (activeAugments && activeAugments.length > 0) {
@@ -3703,10 +3716,23 @@ function updateEnemyAI(scene, time) {
     enemies.children.entries.forEach(enemy => {
         if (!enemy.active || !player.active) return;
         
-        // Ensure boss body stays enabled
-        if (enemy.isBoss && enemy.body && !enemy.body.enable) {
-            console.warn('Boss body was disabled in updateEnemyAI, re-enabling!');
-            enemy.body.enable = true;
+        // Ensure boss stays active and body stays enabled
+        if (enemy.isBoss) {
+            if (!enemy.active) {
+                console.error('Boss became inactive! Re-activating.');
+                enemy.setActive(true);
+            }
+            if (enemy.body) {
+                if (!enemy.body.enable) {
+                    console.warn('Boss body was disabled in updateEnemyAI, re-enabling!');
+                }
+                enemy.body.enable = true;
+            }
+            // Ensure boss is in enemies group
+            if (enemies && !enemies.contains(enemy)) {
+                console.error('Boss removed from enemies group! Re-adding.');
+                enemies.add(enemy);
+            }
         }
         
         // Handle enemy regen
@@ -4120,7 +4146,7 @@ function gameOver(victory = false) {
         `FLOORS CLEARED: ${gameStats.floorsCleared}\n` +
         `ENEMIES KILLED: ${gameStats.enemiesKilled}\n` +
         `TIME SURVIVED: ${formatTime(gameStats.timeSurvived)}\n` +
-        `MUTATIONS: ${gameStats.mutationsCollected}\n` +
+        `AUGMENTS: ${gameStats.mutationsCollected}\n` +
         `FINAL LEVEL: ${gameStats.finalLevel}\n` +
         `\nSCORE: ${score}`,
         statsStyle
@@ -4142,23 +4168,24 @@ function gameOver(victory = false) {
     highScoreText.setOrigin(0.5);
     highScoreText.setDepth(201);
     
-    // Create Play Again button
-    restartButton = gameScene.add.rectangle(400, 480, 250, 60, 0x00ffff);
+    // Create Play Again button (restart with same character)
+    restartButton = gameScene.add.rectangle(300, 480, 200, 50, 0x00ffff);
     restartButton.setInteractive({ useHandCursor: true });
     restartButton.setDepth(201);
+    restartButton.setScrollFactor(0);
     
-    const restartText = gameScene.add.text(400, 480, 'CHARACTER SELECT', {
-        fontSize: '24px',
+    const restartText = gameScene.add.text(300, 480, 'PLAY AGAIN', {
+        fontSize: '20px',
         fill: '#000000',
         fontFamily: 'Courier New',
         fontStyle: 'bold'
     });
     restartText.setOrigin(0.5);
     restartText.setDepth(202);
+    restartText.setScrollFactor(0);
     
     restartButton.on('pointerdown', () => {
-        // Return to character select instead of restarting
-        gameScene.scene.start('CharacterSelectScene');
+        restartGame();
     });
     
     restartButton.on('pointerover', () => {
@@ -4169,11 +4196,40 @@ function gameOver(victory = false) {
         restartButton.setFillStyle(0x00ffff, 1);
     });
     
+    // Create Select Character button
+    const selectCharButton = gameScene.add.rectangle(500, 480, 200, 50, 0x00ff00);
+    selectCharButton.setInteractive({ useHandCursor: true });
+    selectCharButton.setDepth(201);
+    selectCharButton.setScrollFactor(0);
+    
+    const selectCharText = gameScene.add.text(500, 480, 'SELECT CHARACTER', {
+        fontSize: '18px',
+        fill: '#000000',
+        fontFamily: 'Courier New',
+        fontStyle: 'bold'
+    });
+    selectCharText.setOrigin(0.5);
+    selectCharText.setDepth(202);
+    selectCharText.setScrollFactor(0);
+    
+    selectCharButton.on('pointerdown', () => {
+        gameScene.scene.start('CharacterSelectScene');
+    });
+    
+    selectCharButton.on('pointerover', () => {
+        selectCharButton.setFillStyle(0x00ff00, 0.8);
+    });
+    
+    selectCharButton.on('pointerout', () => {
+        selectCharButton.setFillStyle(0x00ff00, 1);
+    });
+    
     // Add menu button
     const menuButton = gameScene.add.rectangle(400, 540, 200, 50, 0x666666);
     menuButton.setStrokeStyle(2, 0x888888, 1);
     menuButton.setInteractive({ useHandCursor: true });
     menuButton.setDepth(201);
+    menuButton.setScrollFactor(0);
     
     const menuText = gameScene.add.text(400, 540, 'MAIN MENU', {
         fontSize: '20px',
@@ -4183,6 +4239,7 @@ function gameOver(victory = false) {
     });
     menuText.setOrigin(0.5);
     menuText.setDepth(202);
+    menuText.setScrollFactor(0);
     
     menuButton.on('pointerdown', () => {
         gameScene.scene.start('MainMenuScene');
@@ -4244,6 +4301,12 @@ function restartGame() {
         restartButton.destroy();
         restartButton = null;
     }
+    // Clean up any other game over UI elements
+    gameScene.children.list.forEach(child => {
+        if (child.depth >= 200 && child.depth < 300) {
+            child.destroy();
+        }
+    });
     
     // Destroy any overlay elements (they might be in a container)
     gameScene.children.list.forEach(child => {
