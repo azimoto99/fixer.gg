@@ -2820,6 +2820,9 @@ function spawnBoss(scene, room) {
     boss.attackPattern = 'shotgun'; // Boss default attack pattern
     boss.behavior = 'chase'; // Will be overridden by updateBossBehavior
     boss.damage = 15 + (currentFloor * 2);
+    // Ensure boss never has shield
+    boss.hasShield = false;
+    boss.shieldActive = false;
     
     // Room bounds to keep boss in the room
     boss.roomBounds = {
@@ -3318,18 +3321,23 @@ function hitEnemy(bullet, enemy) {
     
     // Additional check for boss - ensure body exists and is active
     if (enemy.isBoss) {
+        const healthPercent = (enemy.health / enemy.maxHealth * 100).toFixed(1);
         if (!enemy.body) {
-            console.error('Boss has no body! Health:', enemy.health, 'Active:', enemy.active);
+            console.error(`Boss has no body at ${healthPercent}% health! Active: ${enemy.active}, Phase: ${enemy.bossPhase}`);
             return;
         }
         if (!enemy.body.enable) {
-            console.warn(`Boss body is disabled at ${((enemy.health / enemy.maxHealth) * 100).toFixed(1)}% health, re-enabling!`);
+            console.warn(`Boss body is disabled at ${healthPercent}% health (Phase ${enemy.bossPhase}), re-enabling!`);
             enemy.body.enable = true;
             // Don't return - continue with the hit
         }
         // Always ensure body is enabled for boss
         if (!enemy.body.enable) {
             enemy.body.enable = true;
+        }
+        // Debug: Log when boss is hit but might not take damage
+        if (enemy.bossPhase === 2) {
+            console.log(`Boss Phase 2 hit attempt - Body enabled: ${enemy.body.enable}, Active: ${enemy.active}, HasShield: ${enemy.hasShield}`);
         }
     }
     
@@ -3352,8 +3360,15 @@ function hitEnemy(bullet, enemy) {
     
     // Check for enemy shield
     if (enemy.hasShield && enemy.shieldActive) {
-        enemy.shieldActive = false;
-        return;
+        if (enemy.isBoss) {
+            console.warn('Boss has shield active - this should not happen! Disabling shield.');
+            enemy.hasShield = false;
+            enemy.shieldActive = false;
+            // Continue with damage - don't return
+        } else {
+            enemy.shieldActive = false;
+            return;
+        }
     }
     
     // Apply damage
@@ -4677,9 +4692,20 @@ function updateBossBehavior(boss, time) {
             boss.body.enable = true;
         }
     } else if (healthPercent < 0.6 && boss.bossPhase < 2) {
+        console.log(`Boss entering Phase 2 at ${(healthPercent * 100).toFixed(1)}% health`);
         boss.bossPhase = 2;
         boss.speed = Math.min(150, boss.speed * 1.2);
         boss.shootCooldown = Math.max(300, boss.shootCooldown * 0.7);
+        // Ensure body stays enabled during phase change
+        if (boss.body) {
+            boss.body.enable = true;
+            console.log('Boss body enabled during phase 2 transition');
+        } else {
+            console.error('Boss has no body during phase 2 transition!');
+        }
+        // Ensure boss never gets shield
+        boss.hasShield = false;
+        boss.shieldActive = false;
     }
     
     // Cycle through attack and movement patterns every 3 seconds
