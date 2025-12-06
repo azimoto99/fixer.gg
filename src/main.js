@@ -619,6 +619,9 @@ class GameScene extends Phaser.Scene {
     create() {
         console.log('GameScene.create() called');
         try {
+            // Clean up any existing game state first
+            cleanupGameState();
+            
             // Initialize game with selected character
             if (!selectedCharacter) {
                 console.log('No character selected, using default');
@@ -949,6 +952,10 @@ class GameScene extends Phaser.Scene {
 
     update(time) {
         if (isGameOver || isLevelUpScreen) {
+            // Reset player velocity when game is paused
+            if (player && player.body) {
+                player.setVelocity(0, 0);
+            }
             return;
         }
         
@@ -982,15 +989,21 @@ class GameScene extends Phaser.Scene {
         let velocityX = 0;
         let velocityY = 0;
         
-        if (cursors.left.isDown || wasdKeys.A.isDown) {
+        // Check if keys are actually pressed (not just stuck)
+        const leftPressed = cursors.left.isDown || wasdKeys.A.isDown;
+        const rightPressed = cursors.right.isDown || wasdKeys.D.isDown;
+        const upPressed = cursors.up.isDown || wasdKeys.W.isDown;
+        const downPressed = cursors.down.isDown || wasdKeys.S.isDown;
+        
+        if (leftPressed && !rightPressed) {
             velocityX = -playerSpeed;
-        } else if (cursors.right.isDown || wasdKeys.D.isDown) {
+        } else if (rightPressed && !leftPressed) {
             velocityX = playerSpeed;
         }
         
-        if (cursors.up.isDown || wasdKeys.W.isDown) {
+        if (upPressed && !downPressed) {
             velocityY = -playerSpeed;
-        } else if (cursors.down.isDown || wasdKeys.S.isDown) {
+        } else if (downPressed && !upPressed) {
             velocityY = playerSpeed;
         }
         
@@ -1000,7 +1013,10 @@ class GameScene extends Phaser.Scene {
             velocityY *= 0.707;
         }
         
-        player.setVelocity(velocityX, velocityY);
+        // Always set velocity (even if 0,0) to prevent stuck movement
+        if (player && player.body) {
+            player.setVelocity(velocityX, velocityY);
+        }
         
         // Polish: Update player glow position
         if (player.glow) {
@@ -2912,15 +2928,32 @@ function spawnBoss(scene, room) {
 
 // Show augment selection screen
 function showAugmentSelection() {
-    if (augmentSelectionActive) return;
+    if (augmentSelectionActive) {
+        console.log('Augment selection already active, skipping');
+        return;
+    }
     
+    console.log('Showing augment selection screen');
     augmentSelectionActive = true;
+    
+    // Stop player movement
+    if (player && player.body) {
+        player.setVelocity(0, 0);
+    }
     
     // Pause game updates
     isLevelUpScreen = true;
     
     // Get random augments
+    if (!availableAugments) {
+        availableAugments = [];
+    }
     availableAugments = getRandomAugments(3);
+    
+    if (!gameScene) {
+        console.error('gameScene is null, cannot show augment selection');
+        return;
+    }
     
     // Create overlay
     augmentSelectionOverlay = gameScene.add.container(400, 300);
@@ -3151,7 +3184,7 @@ function checkRoomCleared() {
     // Count living enemies in current room
     let livingEnemies = 0;
     enemies.children.entries.forEach(enemy => {
-        if (!enemy.active) return;
+        if (!enemy || !enemy.active) return;
         
         // Check if enemy is in current room
         if (enemy.x >= currentRoom.x && enemy.x <= currentRoom.x + currentRoom.width &&
@@ -3176,6 +3209,7 @@ function checkRoomCleared() {
         
         // If this is the boss room and boss is dead, show augment selection
         if (currentRoom.isBossRoom && currentRoomId === bossRoomId) {
+            console.log(`Boss room cleared! Room ID: ${currentRoomId}, Boss Room ID: ${bossRoomId}, isBossRoom: ${currentRoom.isBossRoom}`);
             showAugmentSelection();
         }
     }
@@ -3447,9 +3481,17 @@ function killEnemy(enemy) {
         enemy.bossLabel.destroy();
     }
     
-    // Remove enemy
+    // Remove enemy from states
+    if (enemyStates.has(enemy)) {
+        enemyStates.delete(enemy);
+    }
+    
+    // Remove enemy from group and destroy
     enemies.remove(enemy);
     enemy.destroy();
+    
+    // Check if room is cleared (especially important for boss rooms)
+    checkRoomCleared();
 }
 
 // Drop loot from killed enemies
@@ -3539,6 +3581,11 @@ function checkLevelUp() {
 
 function showLevelUpScreen() {
     isLevelUpScreen = true;
+    
+    // Stop player movement
+    if (player && player.body) {
+        player.setVelocity(0, 0);
+    }
     
     // Pause all enemies
     enemies.children.entries.forEach(enemy => {
@@ -3727,6 +3774,10 @@ function updateAugmentsDisplay() {
 }
 
 function closeLevelUpScreen() {
+    // Reset player velocity when closing level up screen
+    if (player && player.body) {
+        player.setVelocity(0, 0);
+    }
     if (!levelUpOverlay) return;
     
     // Destroy overlay elements
@@ -4242,6 +4293,8 @@ function gameOver(victory = false) {
     selectCharText.setScrollFactor(0);
     
     selectCharButton.on('pointerdown', () => {
+        // Clean up game state before going to character select
+        cleanupGameState();
         gameScene.scene.start('CharacterSelectScene');
     });
     
@@ -4306,20 +4359,64 @@ function saveHighScore(score) {
     }
 }
 
-function restartGame() {
+function cleanupGameState() {
     // Close level up screen if open
     if (isLevelUpScreen) {
         closeLevelUpScreen();
     }
     
-    // Destroy all game objects
-    bullets.clear(true, true);
-    enemyBullets.clear(true, true);
-    enemies.clear(true, true);
-    enemyHealthBars.removeAll(true);
-    weaponPickups.clear(true, true);
-    healthPickups.clear(true, true);
+    // Destroy all game objects if they exist
+    if (bullets) bullets.clear(true, true);
+    if (enemyBullets) enemyBullets.clear(true, true);
+    if (enemies) enemies.clear(true, true);
+    if (enemyHealthBars) enemyHealthBars.removeAll(true);
+    if (weaponPickups) weaponPickups.clear(true, true);
+    if (healthPickups) healthPickups.clear(true, true);
     stopLaser();
+    
+    // Clean up game over screen
+    if (gameOverText) {
+        gameOverText.destroy();
+        gameOverText = null;
+    }
+    if (restartButton) {
+        restartButton.destroy();
+        restartButton = null;
+    }
+    
+    // Clean up any UI elements if gameScene exists
+    if (gameScene) {
+        gameScene.children.list.forEach(child => {
+            if (child.depth >= 200) {
+                child.destroy();
+            }
+        });
+    }
+    
+    if (exitPortal) {
+        if (exitPortal.glow) exitPortal.glow.destroy();
+        if (exitPortal.text) exitPortal.text.destroy();
+        exitPortal.destroy();
+        exitPortal = null;
+    }
+    
+    // Reset game state
+    isGameOver = false;
+    isLevelUpScreen = false;
+    currentRoom = 1;
+    isRoomCleared = false;
+    playerXP = 0;
+    playerLevel = 1;
+    xpToNextLevel = 100;
+    activeMutations = [];
+    totalEnemiesKilled = 0;
+    playerInvincible = false;
+    playerInvincibleUntil = 0;
+    currentFloor = 1;
+}
+
+function restartGame() {
+    cleanupGameState();
     
     // Clean up game over screen
     if (gameOverText) {
@@ -4426,10 +4523,21 @@ function updateHealthBars(scene, time) {
             // Boss: scale by healthPercent (base scale is 3)
             const baseScale = enemy.healthBarBaseScale || 3;
             const bgHeightScale = 1.5;
-            const newScaleX = healthPercent * baseScale;
+            const newScaleX = Math.max(0.01, healthPercent * baseScale); // Minimum scale to keep visible
+            
+            // Ensure healthBarFill is visible and active
+            if (!enemy.healthBarFill.visible) {
+                enemy.healthBarFill.setVisible(true);
+            }
+            if (!enemy.healthBarFill.active) {
+                enemy.healthBarFill.setActive(true);
+            }
+            
             enemy.healthBarFill.setScale(newScaleX, bgHeightScale);
             
             // Reposition fill to stay left-aligned
+            // The fill has origin (0, 0.5) so it scales from the left edge
+            // x position should stay constant at the left edge of the background
             if (enemy.healthBarBaseWidth) {
                 enemy.healthBarFill.x = -enemy.healthBarBaseWidth / 2;
             }
