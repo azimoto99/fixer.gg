@@ -3317,8 +3317,20 @@ function hitEnemy(bullet, enemy) {
     }
     
     // Additional check for boss - ensure body exists and is active
-    if (enemy.isBoss && (!enemy.body || !enemy.body.enable)) {
-        return;
+    if (enemy.isBoss) {
+        if (!enemy.body) {
+            console.error('Boss has no body! Health:', enemy.health, 'Active:', enemy.active);
+            return;
+        }
+        if (!enemy.body.enable) {
+            console.warn(`Boss body is disabled at ${((enemy.health / enemy.maxHealth) * 100).toFixed(1)}% health, re-enabling!`);
+            enemy.body.enable = true;
+            // Don't return - continue with the hit
+        }
+        // Always ensure body is enabled for boss
+        if (!enemy.body.enable) {
+            enemy.body.enable = true;
+        }
     }
     
     // Prevent multiple hits from same bullet
@@ -3712,6 +3724,12 @@ function closeLevelUpScreen() {
 function updateEnemyAI(scene, time) {
     enemies.children.entries.forEach(enemy => {
         if (!enemy.active || !player.active) return;
+        
+        // Ensure boss body stays enabled
+        if (enemy.isBoss && enemy.body && !enemy.body.enable) {
+            console.warn('Boss body was disabled in updateEnemyAI, re-enabling!');
+            enemy.body.enable = true;
+        }
         
         // Handle enemy regen
         if (enemy.hasRegen && time > enemy.lastRegen + enemy.regenCooldown) {
@@ -4654,6 +4672,10 @@ function updateBossBehavior(boss, time) {
         boss.bossPhase = 3;
         boss.speed = Math.min(200, boss.speed * 1.3);
         boss.shootCooldown = Math.max(200, boss.shootCooldown * 0.5);
+        // Ensure body stays enabled during phase change
+        if (boss.body) {
+            boss.body.enable = true;
+        }
     } else if (healthPercent < 0.6 && boss.bossPhase < 2) {
         boss.bossPhase = 2;
         boss.speed = Math.min(150, boss.speed * 1.2);
