@@ -380,9 +380,9 @@ class CharacterSelectScene extends Phaser.Scene {
             const x = startX + col * spacingX;
             const y = startY + row * spacingY;
 
-            // Character preview circle
-            const preview = this.add.circle(x, y, 30, char.color, 0.8);
-            preview.setStrokeStyle(3, char.color, 1);
+            // Character preview using realistic sprite
+            const preview = this.add.image(x, y, `${key}_preview`);
+            preview.setScale(0.8);
             preview.setInteractive({ useHandCursor: true });
             characterPreviews.push(preview);
 
@@ -422,26 +422,25 @@ class CharacterSelectScene extends Phaser.Scene {
 
             // Button interaction
             preview.on('pointerover', () => {
-                preview.setScale(1.2);
-                preview.setFillStyle(char.color, 1);
+                preview.setScale(1.0);
+                preview.setTint(0xffffff);
             });
             preview.on('pointerout', () => {
                 if (selectedIndex !== index) {
-                    preview.setScale(1);
-                    preview.setFillStyle(char.color, 0.8);
+                    preview.setScale(0.8);
+                    preview.clearTint();
                 }
             });
             preview.on('pointerdown', () => {
                 // Deselect previous
                 if (selectedIndex >= 0) {
-                    const prevChar = characterKeys[selectedIndex];
-                    characterPreviews[selectedIndex].setScale(1);
-                    characterPreviews[selectedIndex].setFillStyle(characters[prevChar].color, 0.8);
+                    characterPreviews[selectedIndex].setScale(0.8);
+                    characterPreviews[selectedIndex].clearTint();
                 }
                 // Select new
                 selectedIndex = index;
-                preview.setScale(1.2);
-                preview.setFillStyle(char.color, 1);
+                preview.setScale(1.0);
+                preview.setTint(0xffffff);
                 selectedCharacter = key;
             });
 
@@ -452,8 +451,8 @@ class CharacterSelectScene extends Phaser.Scene {
         if (characterPreviews.length > 0) {
             selectedIndex = 0;
             selectedCharacter = characterKeys[0];
-            characterPreviews[0].setScale(1.2);
-            characterPreviews[0].setFillStyle(characters[characterKeys[0]].color, 1);
+            characterPreviews[0].setScale(1.0);
+            characterPreviews[0].setTint(0xffffff);
         }
 
         // Start game button
@@ -511,60 +510,128 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // Create top-down player sprites for each weapon
+        // Create realistic character sprites for each character and weapon combination
         const weaponTypes = ['pistol', 'smg', 'shotgun', 'laser'];
-        weaponTypes.forEach(weaponType => {
-            const g = this.add.graphics();
-            const centerX = 16;
-            const centerY = 20;
+        const characterKeys = Object.keys(characters);
+        
+        characterKeys.forEach(charKey => {
+            const char = characters[charKey];
+            weaponTypes.forEach(weaponType => {
+                const g = this.add.graphics();
+                const centerX = 16;
+                const centerY = 20;
+                
+                // Head (circle)
+                g.fillStyle(0xffdbac, 1); // Skin tone
+                g.fillCircle(centerX, centerY - 8, 7);
+                g.lineStyle(1, 0x000000, 0.3);
+                g.strokeCircle(centerX, centerY - 8, 7);
+                
+                // Character-specific hair styles and colors
+                let hairColor = 0x4a3728; // Default brown
+                if (charKey === 'reaper') hairColor = 0x000000; // Black
+                else if (charKey === 'tank') hairColor = 0x666666; // Gray
+                else if (charKey === 'scout') hairColor = 0xffd700; // Blonde
+                else if (charKey === 'sniper') hairColor = 0x8b4513; // Dark brown
+                else if (charKey === 'berserker') hairColor = 0xff4500; // Red-orange
+                
+                g.fillStyle(hairColor, 1);
+                g.fillCircle(centerX, centerY - 12, 6);
+                g.fillStyle(hairColor + 0x111111, 1); // Lighter shade for depth
+                g.fillCircle(centerX - 2, centerY - 13, 4);
+                
+                // Character-specific body (using character color)
+                g.fillStyle(char.color, 1);
+                g.fillCircle(centerX, centerY, 5);
+                
+                // Arms (skin tone)
+                g.fillStyle(0xffdbac, 1);
+                g.fillRect(centerX - 8, centerY - 2, 3, 6);
+                g.fillRect(centerX + 5, centerY - 2, 3, 6);
+                
+                // Character-specific details
+                if (charKey === 'tank') {
+                    // Add armor plating
+                    g.fillStyle(0x404040, 0.8);
+                    g.fillRect(centerX - 2, centerY - 3, 4, 8);
+                } else if (charKey === 'reaper') {
+                    // Add hood/cloak
+                    g.fillStyle(0x1a1a1a, 0.7);
+                    g.fillCircle(centerX, centerY - 10, 8);
+                } else if (charKey === 'scout') {
+                    // Add goggles
+                    g.fillStyle(0x00ff00, 0.6);
+                    g.fillCircle(centerX - 3, centerY - 8, 2);
+                    g.fillCircle(centerX + 3, centerY - 8, 2);
+                }
+                
+                // Weapon (varies by type)
+                g.fillStyle(0xc0c0c0, 1);
+                g.lineStyle(1, 0x808080, 1);
+                if (weaponType === 'pistol') {
+                    g.fillRect(centerX + 2, centerY - 1, 8, 3);
+                    g.strokeRect(centerX + 2, centerY - 1, 8, 3);
+                } else if (weaponType === 'smg') {
+                    g.fillRect(centerX + 2, centerY - 1, 12, 3);
+                    g.strokeRect(centerX + 2, centerY - 1, 12, 3);
+                } else if (weaponType === 'shotgun') {
+                    g.fillRect(centerX + 2, centerY - 2, 10, 5);
+                    g.strokeRect(centerX + 2, centerY - 2, 10, 5);
+                } else if (weaponType === 'laser') {
+                    g.fillRect(centerX + 2, centerY - 1, 10, 3);
+                    g.strokeRect(centerX + 2, centerY - 1, 10, 3);
+                    g.fillStyle(0x00ffff, 0.5);
+                    g.fillRect(centerX + 10, centerY - 1, 2, 3);
+                }
+                
+                g.generateTexture(`${charKey}_${weaponType}`, 32, 40);
+            });
             
-            // Head (circle)
-            g.fillStyle(0xffdbac, 1); // Skin tone
-            g.fillCircle(centerX, centerY - 8, 7);
-            g.lineStyle(1, 0x000000, 0.3);
-            g.strokeCircle(centerX, centerY - 8, 7);
+            // Create character preview sprite for selection screen
+            const previewG = this.add.graphics();
+            const pCenterX = 30;
+            const pCenterY = 30;
             
-            // Hair (on top of head)
-            g.fillStyle(0x4a3728, 1); // Brown hair
-            g.fillCircle(centerX, centerY - 12, 6);
-            g.fillStyle(0x5a4738, 1); // Lighter brown for depth
-            g.fillCircle(centerX - 2, centerY - 13, 4);
+            // Head
+            previewG.fillStyle(0xffdbac, 1);
+            previewG.fillCircle(pCenterX, pCenterY - 12, 10);
+            previewG.lineStyle(2, 0x000000, 0.3);
+            previewG.strokeCircle(pCenterX, pCenterY - 12, 10);
             
-            // Body (small circle/torso)
-            g.fillStyle(0x00ffff, 1); // Cyan body
-            g.fillCircle(centerX, centerY, 5);
+            // Hair (character-specific)
+            let hairColor = 0x4a3728;
+            if (charKey === 'reaper') hairColor = 0x000000;
+            else if (charKey === 'tank') hairColor = 0x666666;
+            else if (charKey === 'scout') hairColor = 0xffd700;
+            else if (charKey === 'sniper') hairColor = 0x8b4513;
+            else if (charKey === 'berserker') hairColor = 0xff4500;
             
-            // Arms (two small arms holding gun)
-            g.fillStyle(0xffdbac, 1); // Skin tone
-            // Left arm
-            g.fillRect(centerX - 8, centerY - 2, 3, 6);
-            // Right arm
-            g.fillRect(centerX + 5, centerY - 2, 3, 6);
+            previewG.fillStyle(hairColor, 1);
+            previewG.fillCircle(pCenterX, pCenterY - 18, 8);
             
-            // Gun (silver, changes slightly by weapon type)
-            g.fillStyle(0xc0c0c0, 1); // Silver
-            g.lineStyle(1, 0x808080, 1);
-            if (weaponType === 'pistol') {
-                // Pistol - small handgun
-                g.fillRect(centerX + 2, centerY - 1, 8, 3);
-                g.strokeRect(centerX + 2, centerY - 1, 8, 3);
-            } else if (weaponType === 'smg') {
-                // SMG - longer barrel
-                g.fillRect(centerX + 2, centerY - 1, 12, 3);
-                g.strokeRect(centerX + 2, centerY - 1, 12, 3);
-            } else if (weaponType === 'shotgun') {
-                // Shotgun - wider, shorter
-                g.fillRect(centerX + 2, centerY - 2, 10, 5);
-                g.strokeRect(centerX + 2, centerY - 2, 10, 5);
-            } else if (weaponType === 'laser') {
-                // Laser - sleek, futuristic
-                g.fillRect(centerX + 2, centerY - 1, 10, 3);
-                g.strokeRect(centerX + 2, centerY - 1, 10, 3);
-                g.fillStyle(0x00ffff, 0.5);
-                g.fillRect(centerX + 10, centerY - 1, 2, 3);
+            // Body (character color)
+            previewG.fillStyle(char.color, 1);
+            previewG.fillCircle(pCenterX, pCenterY, 8);
+            
+            // Arms
+            previewG.fillStyle(0xffdbac, 1);
+            previewG.fillRect(pCenterX - 12, pCenterY - 3, 4, 8);
+            previewG.fillRect(pCenterX + 8, pCenterY - 3, 4, 8);
+            
+            // Character-specific details (larger for preview)
+            if (charKey === 'tank') {
+                previewG.fillStyle(0x404040, 0.8);
+                previewG.fillRect(pCenterX - 3, pCenterY - 5, 6, 12);
+            } else if (charKey === 'reaper') {
+                previewG.fillStyle(0x1a1a1a, 0.7);
+                previewG.fillCircle(pCenterX, pCenterY - 15, 12);
+            } else if (charKey === 'scout') {
+                previewG.fillStyle(0x00ff00, 0.6);
+                previewG.fillCircle(pCenterX - 4, pCenterY - 12, 3);
+                previewG.fillCircle(pCenterX + 4, pCenterY - 12, 3);
             }
             
-            g.generateTexture(`player_${weaponType}`, 32, 40);
+            previewG.generateTexture(`${charKey}_preview`, 60, 60);
         });
         
         // Default player sprite (pistol)
@@ -834,7 +901,7 @@ class GameScene extends Phaser.Scene {
             return;
         }
         const firstRoom = mapRooms[0];
-        player = this.physics.add.sprite(firstRoom.centerX, firstRoom.centerY, 'player');
+        player = this.physics.add.sprite(firstRoom.centerX, firstRoom.centerY, `${selectedCharacter}_pistol`);
         player.setCollideWorldBounds(true);
         player.setScale(1.2); // Slightly smaller scale since humanoid sprite is taller
         player.setDepth(10);
@@ -1173,6 +1240,12 @@ class GameScene extends Phaser.Scene {
         );
         player.setRotation(angle + Math.PI / 2);
         
+        // Update player glow position to follow player
+        if (player.glow) {
+            player.glow.x = player.x;
+            player.glow.y = player.y;
+        }
+        
         // Apply berserker passive (damage increases when low on health)
         if (selectedCharacter === 'berserker') {
             const healthPercent = playerHealth / playerMaxHealth;
@@ -1415,10 +1488,10 @@ function switchWeapon(weaponName) {
         currentWeapon = weapons[weaponName];
         stopLaser();
         
-        // Update player sprite to match weapon
+        // Update player sprite to match weapon and character
         if (player && gameScene) {
             const oldTexture = player.texture.key;
-            player.setTexture(`player_${weaponName}`);
+            player.setTexture(`${selectedCharacter}_${weaponName}`);
             // Maintain scale and position
             player.setScale(1.2);
         }
@@ -1466,16 +1539,19 @@ function shoot(scene, time) {
     
     if (currentWeapon.type === 'shotgun') {
         // Shotgun fires multiple bullets in spread
-        const spreadAngle = 0.3; // Total spread angle in radians
+        const baseAngle = Phaser.Math.Angle.Between(
+            player.x,
+            player.y,
+            mousePointer.worldX,
+            mousePointer.worldY
+        );
+        const spreadAngle = 0.4; // Total spread angle in radians (wider spread)
         const shotgunBulletCount = currentWeapon.spread;
         
         for (let i = 0; i < shotgunBulletCount; i++) {
-            const angle = Phaser.Math.Angle.Between(
-                player.x,
-                player.y,
-                mousePointer.worldX,
-                mousePointer.worldY
-            ) + (i - shotgunBulletCount / 2) * (spreadAngle / shotgunBulletCount);
+            // Create a proper spray pattern instead of linear spread
+            const spreadOffset = (Math.random() - 0.5) * spreadAngle;
+            const angle = baseAngle + spreadOffset;
             
             const bullet = bullets.get(player.x, player.y);
             if (bullet) {
@@ -2940,10 +3016,17 @@ function startRoom(scene) {
                     pickup.label.destroy();
                     pickup.label = null;
                 }
+                // Clean up any augment-specific properties
+                if (pickup.augment) {
+                    pickup.augment = null;
+                }
             }
         });
         weaponPickups.clear(true, true);
     }
+    
+    // Clean up any orphaned visual elements
+    cleanupOrphanedElements();
     
     if (healthPickups) {
         healthPickups.children.entries.forEach(pickup => {
@@ -3874,7 +3957,7 @@ function killEnemy(enemy) {
     
     // Remove health bar from container first, then destroy
     if (enemy.healthBar) {
-        if (enemyHealthBars && enemyHealthBars.contains(enemy.healthBar)) {
+        if (enemyHealthBars && enemyHealthBars.list.includes(enemy.healthBar)) {
             enemyHealthBars.remove(enemy.healthBar);
         }
         enemy.healthBar.destroy();
@@ -4802,12 +4885,41 @@ function cleanupGameState() {
         closeLevelUpScreen();
     }
     
+    // Close augment selection if open
+    if (augmentSelectionActive) {
+        closeAugmentSelection();
+    }
+    
     // Destroy all game objects if they exist
     if (bullets) bullets.clear(true, true);
     if (enemyBullets) enemyBullets.clear(true, true);
-    if (enemies) enemies.clear(true, true);
+    if (enemies) {
+        // Clean up individual enemy health bars before clearing enemies
+        enemies.children.entries.forEach(enemy => {
+            if (enemy && enemy.healthBar) {
+                if (enemyHealthBars) {
+                    enemyHealthBars.remove(enemy.healthBar);
+                }
+                enemy.healthBar.destroy();
+                enemy.healthBar = null;
+                if (enemy.healthBarFill) {
+                    enemy.healthBarFill.destroy();
+                    enemy.healthBarFill = null;
+                }
+            }
+        });
+        enemies.clear(true, true);
+    }
     if (enemyHealthBars) enemyHealthBars.removeAll(true);
-    if (weaponPickups) weaponPickups.clear(true, true);
+    if (weaponPickups) {
+        // Clean up individual weapon pickups to prevent orphaned augment icons
+        weaponPickups.children.entries.forEach(pickup => {
+            if (pickup && pickup.label) {
+                pickup.label.destroy();
+            }
+        });
+        weaponPickups.clear(true, true);
+    }
     if (healthPickups) healthPickups.clear(true, true);
     stopLaser();
     
@@ -5506,5 +5618,57 @@ function cleanupBulletTrail(bullet) {
     if (bullet.hitEnemies) {
         bullet.hitEnemies.clear();
         bullet.hitEnemies = null;
+    }
+}
+
+// Function to clean up orphaned visual elements that cause glitches
+function cleanupOrphanedElements() {
+    if (!gameScene) return;
+    
+    // Clean up orphaned health bars
+    if (enemyHealthBars) {
+        enemyHealthBars.children.entries.forEach(healthBar => {
+            // Check if health bar has a valid parent enemy
+            let hasValidParent = false;
+            if (enemies) {
+                enemies.children.entries.forEach(enemy => {
+                    if (enemy && enemy.healthBar === healthBar) {
+                        hasValidParent = true;
+                    }
+                });
+            }
+            
+            // If no valid parent, remove the orphaned health bar
+            if (!hasValidParent) {
+                enemyHealthBars.remove(healthBar);
+                if (healthBar && healthBar.destroy) {
+                    healthBar.destroy();
+                }
+            }
+        });
+    }
+    
+    // Clean up orphaned augment pickup labels and icons
+    if (weaponPickups) {
+        weaponPickups.children.entries.forEach(pickup => {
+            // Clean up any floating labels without valid pickups
+            if (pickup && pickup.label && (!pickup.active || pickup.body === null)) {
+                pickup.label.destroy();
+                pickup.label = null;
+            }
+        });
+    }
+    
+    // Clean up any UI elements that might be floating around
+    if (gameScene && gameScene.children) {
+        gameScene.children.list.forEach(child => {
+            // Remove any text objects that are positioned outside the world bounds
+            if (child.type === 'Text' && child.depth < 200) {
+                if (child.x < -100 || child.x > worldWidth + 100 || 
+                    child.y < -100 || child.y > worldHeight + 100) {
+                    child.destroy();
+                }
+            }
+        });
     }
 }
