@@ -2183,6 +2183,12 @@ function generateProceduralMap(numRooms = 8) {
         }
     }
     
+    // Debug: Log all room connections
+    console.log('Room connections:');
+    rooms.forEach(room => {
+        console.log(`Room ${room.id} at (${room.x}, ${room.y}) connects to:`, room.connections);
+    });
+    
     return { rooms, corridors: [] }; // No open corridors, use doors instead
 }
 
@@ -2221,21 +2227,34 @@ function createProceduralMap(scene) {
         const doorWidth = 80; // Width of door opening (larger for easier access)
         
         // Determine which walls need doors (check connections)
+        // Use more precise detection based on room positions
         const hasTopConnection = room.connections.some(connId => {
             const connRoom = mapRooms[connId];
-            return connRoom && connRoom.centerY < room.centerY;
+            if (!connRoom) return false;
+            // Check if connected room is above (same X, lower Y)
+            return Math.abs(connRoom.centerX - room.centerX) < roomWidth * 0.1 && 
+                   connRoom.centerY < room.centerY - roomHeight * 0.5;
         });
         const hasBottomConnection = room.connections.some(connId => {
             const connRoom = mapRooms[connId];
-            return connRoom && connRoom.centerY > room.centerY;
+            if (!connRoom) return false;
+            // Check if connected room is below (same X, higher Y)
+            return Math.abs(connRoom.centerX - room.centerX) < roomWidth * 0.1 && 
+                   connRoom.centerY > room.centerY + roomHeight * 0.5;
         });
         const hasLeftConnection = room.connections.some(connId => {
             const connRoom = mapRooms[connId];
-            return connRoom && connRoom.centerX < room.centerX;
+            if (!connRoom) return false;
+            // Check if connected room is to the left (same Y, lower X)
+            return Math.abs(connRoom.centerY - room.centerY) < roomHeight * 0.1 && 
+                   connRoom.centerX < room.centerX - roomWidth * 0.5;
         });
         const hasRightConnection = room.connections.some(connId => {
             const connRoom = mapRooms[connId];
-            return connRoom && connRoom.centerX > room.centerX;
+            if (!connRoom) return false;
+            // Check if connected room is to the right (same Y, higher X)
+            return Math.abs(connRoom.centerY - room.centerY) < roomHeight * 0.1 && 
+                   connRoom.centerX > room.centerX + roomWidth * 0.5;
         });
         
         // Helper function to create wall segment
@@ -2382,32 +2401,39 @@ function createDoors(scene) {
             const doorSize = 80; // Must match wall opening size
             const doorThickness = 30; // Thick enough to block passage
             
-            // Check if connected room is to the right
-            if (connectedRoom.centerX > room.centerX && Math.abs(connectedRoom.centerY - room.centerY) < 100) {
+            // Determine door position based on relative room positions
+            // Use room dimensions for more accurate detection
+            const dx = connectedRoom.centerX - room.centerX;
+            const dy = connectedRoom.centerY - room.centerY;
+            const thresholdX = roomWidth * 0.6; // Allow some tolerance
+            const thresholdY = roomHeight * 0.6;
+            
+            // Check if connected room is to the right (horizontal connection)
+            if (Math.abs(dx) > Math.abs(dy) && dx > 0 && Math.abs(dy) < thresholdY) {
                 // Door on EAST wall (right), centered vertically
                 doorX = room.x + room.width;
                 doorY = room.centerY;
                 doorW = doorThickness;
                 doorH = doorSize;
             }
-            // Check if connected room is to the left
-            else if (connectedRoom.centerX < room.centerX && Math.abs(connectedRoom.centerY - room.centerY) < 100) {
+            // Check if connected room is to the left (horizontal connection)
+            else if (Math.abs(dx) > Math.abs(dy) && dx < 0 && Math.abs(dy) < thresholdY) {
                 // Door on WEST wall (left), centered vertically
                 doorX = room.x;
                 doorY = room.centerY;
                 doorW = doorThickness;
                 doorH = doorSize;
             }
-            // Check if connected room is below
-            else if (connectedRoom.centerY > room.centerY && Math.abs(connectedRoom.centerX - room.centerX) < 100) {
+            // Check if connected room is below (vertical connection)
+            else if (Math.abs(dy) > Math.abs(dx) && dy > 0 && Math.abs(dx) < thresholdX) {
                 // Door on SOUTH wall (bottom), centered horizontally
                 doorX = room.centerX;
                 doorY = room.y + room.height;
                 doorW = doorSize;
                 doorH = doorThickness;
             }
-            // Check if connected room is above
-            else if (connectedRoom.centerY < room.centerY && Math.abs(connectedRoom.centerX - room.centerX) < 100) {
+            // Check if connected room is above (vertical connection)
+            else if (Math.abs(dy) > Math.abs(dx) && dy < 0 && Math.abs(dx) < thresholdX) {
                 // Door on NORTH wall (top), centered horizontally
                 doorX = room.centerX;
                 doorY = room.y;
@@ -2415,7 +2441,9 @@ function createDoors(scene) {
                 doorH = doorThickness;
             }
             else {
-                return; // Skip diagonal connections
+                // Log for debugging - shouldn't happen if connections are correct
+                console.warn(`Could not determine door position between room ${room.id} and ${connectedRoomId}. dx: ${dx}, dy: ${dy}`);
+                return; // Skip if we can't determine position
             }
             
             const door = scene.add.rectangle(doorX, doorY, doorW, doorH, 0xff4444);
