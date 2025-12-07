@@ -99,24 +99,30 @@ function initializeWeapons() {
             damage: 7,
             fireRate: 150, // ms between shots
             bulletSpeed: 600,
-            color: 0xffff00
+            color: 0xffff00,
+            magazineSize: 9,
+            reloadTime: 1000 // 1 second reload
         },
         smg: {
             name: 'SMG',
             type: 'smg',
             damage: 4,
-            fireRate: 80, // Very fast
+            fireRate: 80, // ms between shots in burst
             bulletSpeed: 650,
-            color: 0x00ff00
+            color: 0x00ff00,
+            burstSize: 3,
+            burstCooldown: 1000, // 1 second between bursts
+            magazineSize: 999 // Infinite for SMG
         },
         shotgun: {
             name: 'Shotgun',
             type: 'shotgun',
             damage: 8,
-            fireRate: 400, // Slow
+            fireRate: 2000, // 2 seconds between shots
             bulletSpeed: 500,
             color: 0xff6600,
-            spread: 5 // Number of bullets
+            spread: 5, // Number of bullets
+            magazineSize: 999 // Infinite for shotgun
         },
         laser: {
             name: 'Laser',
@@ -124,7 +130,8 @@ function initializeWeapons() {
             damage: 3, // Per tick
             fireRate: 50, // Damage tick rate
             bulletSpeed: 0, // Not used for laser
-            color: 0x00ffff
+            color: 0x00ffff,
+            magazineSize: 999 // Infinite for laser
         }
     };
 }
@@ -144,6 +151,14 @@ let playerHealthBar;
 let gameOverText;
 let restartButton;
 let lastFired = 0;
+let currentAmmo = 0;
+let maxAmmo = 9; // Pistol default
+let isReloading = false;
+let reloadTime = 0;
+let smgBurstCount = 0;
+let smgBurstCooldown = 0;
+let shotgunCooldown = 0;
+let bloodStains = []; // Array to store blood stain sprites
 let bulletSpeed = 600;
 let playerSpeed = 200;
 let bulletDamage = 7; // 5-10 damage per bullet
@@ -201,7 +216,7 @@ let deathParticleEmitter;
 let muzzleFlashParticles;
 let muzzleFlashEmitter;
 let damageNumbers;
-let cameraShake = { x: 0, y: 0, intensity: 0, offsetX: 0, offsetY: 0 };
+let cameraShake = { x: 0, y: 0, intensity: 0, offsetX: 0, offsetY: 0, duration: 0, startTime: 0, baseScrollX: 0, baseScrollY: 0 };
 let screenFlash = null;
 let playerInvincible = false;
 let playerInvincibleUntil = 0;
@@ -496,14 +511,66 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // Create enhanced player sprite with glow
+        // Create top-down player sprites for each weapon
+        const weaponTypes = ['pistol', 'smg', 'shotgun', 'laser'];
+        weaponTypes.forEach(weaponType => {
+            const g = this.add.graphics();
+            const centerX = 16;
+            const centerY = 20;
+            
+            // Head (circle)
+            g.fillStyle(0xffdbac, 1); // Skin tone
+            g.fillCircle(centerX, centerY - 8, 7);
+            g.lineStyle(1, 0x000000, 0.3);
+            g.strokeCircle(centerX, centerY - 8, 7);
+            
+            // Hair (on top of head)
+            g.fillStyle(0x4a3728, 1); // Brown hair
+            g.fillCircle(centerX, centerY - 12, 6);
+            g.fillStyle(0x5a4738, 1); // Lighter brown for depth
+            g.fillCircle(centerX - 2, centerY - 13, 4);
+            
+            // Body (small circle/torso)
+            g.fillStyle(0x00ffff, 1); // Cyan body
+            g.fillCircle(centerX, centerY, 5);
+            
+            // Arms (two small arms holding gun)
+            g.fillStyle(0xffdbac, 1); // Skin tone
+            // Left arm
+            g.fillRect(centerX - 8, centerY - 2, 3, 6);
+            // Right arm
+            g.fillRect(centerX + 5, centerY - 2, 3, 6);
+            
+            // Gun (silver, changes slightly by weapon type)
+            g.fillStyle(0xc0c0c0, 1); // Silver
+            g.lineStyle(1, 0x808080, 1);
+            if (weaponType === 'pistol') {
+                // Pistol - small handgun
+                g.fillRect(centerX + 2, centerY - 1, 8, 3);
+                g.strokeRect(centerX + 2, centerY - 1, 8, 3);
+            } else if (weaponType === 'smg') {
+                // SMG - longer barrel
+                g.fillRect(centerX + 2, centerY - 1, 12, 3);
+                g.strokeRect(centerX + 2, centerY - 1, 12, 3);
+            } else if (weaponType === 'shotgun') {
+                // Shotgun - wider, shorter
+                g.fillRect(centerX + 2, centerY - 2, 10, 5);
+                g.strokeRect(centerX + 2, centerY - 2, 10, 5);
+            } else if (weaponType === 'laser') {
+                // Laser - sleek, futuristic
+                g.fillRect(centerX + 2, centerY - 1, 10, 3);
+                g.strokeRect(centerX + 2, centerY - 1, 10, 3);
+                g.fillStyle(0x00ffff, 0.5);
+                g.fillRect(centerX + 10, centerY - 1, 2, 3);
+            }
+            
+            g.generateTexture(`player_${weaponType}`, 32, 40);
+        });
+        
+        // Default player sprite (pistol)
         const playerGraphics = this.add.graphics();
         playerGraphics.fillStyle(0x00ffff, 1);
         playerGraphics.fillCircle(16, 16, 16);
-        playerGraphics.fillStyle(0xffffff, 0.5);
-        playerGraphics.fillCircle(16, 16, 12);
-        playerGraphics.lineStyle(2, 0x00ffff, 1);
-        playerGraphics.strokeCircle(16, 16, 16);
         playerGraphics.generateTexture('player', 32, 32);
         
         // Create enhanced bullet with glow
@@ -520,14 +587,79 @@ class GameScene extends Phaser.Scene {
             .fillCircle(4, 4, 4)
             .generateTexture('enemyBullet', 8, 8);
         
-        // Create enemy textures with different colors
+        // Create top-down enemy textures with similar appearance to player
         const enemyColors = [0xff0000, 0xff00ff, 0xff6600, 0xcc00ff, 0xff0066];
         enemyColors.forEach((color, index) => {
-            this.add.graphics()
-                .fillStyle(color)
-                .fillCircle(12, 12, 12)
-                .generateTexture(`enemy_${index}`, 24, 24);
+            const g = this.add.graphics();
+            const centerX = 12;
+            const centerY = 15;
+            
+            // Head (circle)
+            g.fillStyle(0xffdbac, 1); // Skin tone
+            g.fillCircle(centerX, centerY - 6, 6);
+            g.lineStyle(1, 0x000000, 0.3);
+            g.strokeCircle(centerX, centerY - 6, 6);
+            
+            // Hair (varied colors)
+            const hairColors = [0x4a3728, 0x000000, 0x8b4513, 0xffd700, 0xff1493];
+            g.fillStyle(hairColors[index % hairColors.length], 1);
+            g.fillCircle(centerX, centerY - 10, 5);
+            
+            // Body (colored by enemy type)
+            g.fillStyle(color, 1);
+            g.fillCircle(centerX, centerY, 4);
+            
+            // Arms
+            g.fillStyle(0xffdbac, 1);
+            g.fillRect(centerX - 6, centerY - 1, 2, 5);
+            g.fillRect(centerX + 4, centerY - 1, 2, 5);
+            
+            // Simple weapon (small gun)
+            g.fillStyle(0x808080, 1);
+            g.fillRect(centerX + 1, centerY - 1, 6, 2);
+            
+            g.generateTexture(`enemy_${index}`, 24, 30);
         });
+        
+        // Create boss sprite (larger, more menacing)
+        const bossG = this.add.graphics();
+        const bCenterX = 20;
+        const bCenterY = 25;
+        
+        // Head (larger)
+        bossG.fillStyle(0xff6b6b, 1); // Reddish skin
+        bossG.fillCircle(bCenterX, bCenterY - 10, 9);
+        bossG.lineStyle(2, 0x000000, 0.5);
+        bossG.strokeCircle(bCenterX, bCenterY - 10, 9);
+        
+        // Hair (spiky, menacing)
+        bossG.fillStyle(0x000000, 1);
+        bossG.fillCircle(bCenterX, bCenterY - 16, 7);
+        for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2;
+            const x = bCenterX + Math.cos(angle) * 6;
+            const y = bCenterY - 16 + Math.sin(angle) * 6;
+            bossG.fillCircle(x, y, 2);
+        }
+        
+        // Body (larger, armored)
+        bossG.fillStyle(0x8b0000, 1);
+        bossG.fillCircle(bCenterX, bCenterY, 7);
+        bossG.lineStyle(2, 0xff0000, 0.8);
+        bossG.strokeCircle(bCenterX, bCenterY, 7);
+        
+        // Arms (thicker)
+        bossG.fillStyle(0xff6b6b, 1);
+        bossG.fillRect(bCenterX - 10, bCenterY - 1, 4, 10);
+        bossG.fillRect(bCenterX + 6, bCenterY - 1, 4, 10);
+        
+        // Large weapon
+        bossG.fillStyle(0x404040, 1);
+        bossG.fillRect(bCenterX + 2, bCenterY - 2, 14, 4);
+        bossG.lineStyle(1, 0x000000, 1);
+        bossG.strokeRect(bCenterX + 2, bCenterY - 2, 14, 4);
+        
+        bossG.generateTexture('boss', 40, 50);
         
         // Create health bar background
         this.add.graphics()
@@ -614,6 +746,22 @@ class GameScene extends Phaser.Scene {
         hitGraphics.fillStyle(0xffffff, 0.8);
         hitGraphics.fillCircle(2, 2, 1);
         hitGraphics.generateTexture('hitParticle', 4, 4);
+        
+        // Create blood particle texture
+        const bloodGraphics = this.add.graphics();
+        bloodGraphics.fillStyle(0x8b0000, 1); // Dark red
+        bloodGraphics.fillCircle(2, 2, 2);
+        bloodGraphics.fillStyle(0xff0000, 0.8); // Bright red
+        bloodGraphics.fillCircle(2, 2, 1.5);
+        bloodGraphics.generateTexture('bloodParticle', 4, 4);
+        
+        // Create blood stain texture (larger, more visible)
+        const stainGraphics = this.add.graphics();
+        stainGraphics.fillStyle(0x660000, 0.7); // Dark red, semi-transparent
+        stainGraphics.fillCircle(4, 4, 4);
+        stainGraphics.fillStyle(0x8b0000, 0.5);
+        stainGraphics.fillCircle(4, 4, 3);
+        stainGraphics.generateTexture('bloodStain', 8, 8);
     }
 
     create() {
@@ -646,39 +794,8 @@ class GameScene extends Phaser.Scene {
         baseFireRate = 150 / char.stats.fireRate;
         baseBulletSpeed = 600 * char.stats.bulletSpeed;
         
-        // Update player sprite color based on character (humanoid version)
-        const playerGraphics = this.add.graphics();
-        const centerX = 16;
-        const centerY = 20;
-        
-        // Head (circle)
-        playerGraphics.fillStyle(0xffdbac, 1); // Skin tone
-        playerGraphics.fillCircle(centerX, centerY - 8, 6);
-        playerGraphics.lineStyle(1, 0x000000, 0.3);
-        playerGraphics.strokeCircle(centerX, centerY - 8, 6);
-        
-        // Body (rectangle/torso) - colored by character
-        playerGraphics.fillStyle(char.color, 1);
-        playerGraphics.fillRect(centerX - 5, centerY - 2, 10, 12);
-        playerGraphics.lineStyle(1, 0x000000, 0.3);
-        playerGraphics.strokeRect(centerX - 5, centerY - 2, 10, 12);
-        
-        // Arms
-        playerGraphics.fillStyle(0xffdbac, 1); // Skin tone
-        playerGraphics.fillRect(centerX - 8, centerY, 3, 8); // Left arm
-        playerGraphics.fillRect(centerX + 5, centerY, 3, 8); // Right arm
-        
-        // Legs
-        playerGraphics.fillStyle(0x333333, 1); // Dark pants
-        playerGraphics.fillRect(centerX - 4, centerY + 10, 3, 8); // Left leg
-        playerGraphics.fillRect(centerX + 1, centerY + 10, 3, 8); // Right leg
-        
-        // Feet
-        playerGraphics.fillStyle(0x000000, 1);
-        playerGraphics.fillRect(centerX - 5, centerY + 18, 4, 2); // Left foot
-        playerGraphics.fillRect(centerX + 1, centerY + 18, 4, 2); // Right foot
-        
-        playerGraphics.generateTexture('player', 32, 40);
+        // Player sprites are now created in preload with weapon variants
+        // No need to regenerate here - just ensure current weapon sprite is used
         
         // Continue with existing create logic...
         gameScene = this;
@@ -1297,8 +1414,26 @@ function switchWeapon(weaponName) {
     if (weapons[weaponName] && !isGameOver) {
         currentWeapon = weapons[weaponName];
         stopLaser();
+        
+        // Update player sprite to match weapon
+        if (player && gameScene) {
+            const oldTexture = player.texture.key;
+            player.setTexture(`player_${weaponName}`);
+            // Maintain scale and position
+            player.setScale(1.2);
+        }
+        
+        // Reset ammo and reload state
+        maxAmmo = currentWeapon.magazineSize || 999;
+        currentAmmo = maxAmmo;
+        isReloading = false;
+        smgBurstCount = 0;
+        smgBurstCooldown = 0;
+        shotgunCooldown = 0;
+        
         if (weaponText) {
-            weaponText.setText(`WEAPON: ${currentWeapon.name}`);
+            const ammoText = currentAmmo < 999 ? ` (${currentAmmo}/${maxAmmo})` : '';
+            weaponText.setText(`WEAPON: ${currentWeapon.name}${ammoText}`);
             // Polish: Flash weapon text on switch
             weaponText.setTint(currentWeapon.color);
             gameScene.tweens.add({
@@ -1544,8 +1679,7 @@ function stopLaser() {
 }
 
 function dropWeapon(scene, x, y) {
-    if (Math.random() > 0.2) return; // 20% chance
-    
+    // Always drop a weapon when this function is called (chance is handled by caller)
     const weaponTypes = ['pistol', 'smg', 'shotgun', 'laser'];
     const weaponType = weaponTypes[Phaser.Math.Between(0, weaponTypes.length - 1)];
     
@@ -1554,12 +1688,15 @@ function dropWeapon(scene, x, y) {
     pickup.weaponType = weaponType;
     pickup.setTint(weapons[weaponType].color);
     
-    // Add rotation animation
-    scene.tweens.add({
+    // Add rotation animation (store reference for cleanup)
+    pickup.tween = scene.tweens.add({
         targets: pickup,
         rotation: Math.PI * 2,
         duration: 1000,
-        repeat: -1
+        repeat: -1,
+        onComplete: () => {
+            pickup.tween = null;
+        }
     });
     
     weaponPickups.add(pickup);
@@ -1571,14 +1708,17 @@ function dropHealthPack(scene, x, y) {
     const pickup = scene.physics.add.sprite(x, y, 'healthPickup');
     pickup.setScale(1.5);
     
-    // Add pulsing animation
-    scene.tweens.add({
+    // Add pulsing animation (store reference for cleanup)
+    pickup.tween = scene.tweens.add({
         targets: pickup,
         scaleX: 1.8,
         scaleY: 1.8,
         duration: 500,
         yoyo: true,
-        repeat: -1
+        repeat: -1,
+        onComplete: () => {
+            pickup.tween = null;
+        }
     });
     
     healthPickups.add(pickup);
@@ -1612,9 +1752,16 @@ function pickupWeapon(playerSprite, pickup) {
             onComplete: () => pickupText.destroy()
         });
         
+        // Stop tween if exists
+        if (pickup.tween) {
+            pickup.tween.stop();
+            pickup.tween = null;
+        }
+        
         // Destroy label if exists
         if (pickup.label) {
             pickup.label.destroy();
+            pickup.label = null;
         }
         
         weaponPickups.remove(pickup);
@@ -1645,11 +1792,23 @@ function pickupWeapon(playerSprite, pickup) {
         onComplete: () => pickupText.destroy()
     });
     
+    // Stop tween if exists
+    if (pickup.tween) {
+        pickup.tween.stop();
+        pickup.tween = null;
+    }
+    
     weaponPickups.remove(pickup);
     pickup.destroy();
 }
 
 function pickupHealth(playerSprite, pickup) {
+    // Stop tween if exists
+    if (pickup.tween) {
+        pickup.tween.stop();
+        pickup.tween = null;
+    }
+    
     const healAmount = 30;
     playerHealth = Math.min(playerMaxHealth, playerHealth + healAmount);
     
@@ -2767,13 +2926,55 @@ function createRoomObstacles(scene, templateIndex) {
 function startRoom(scene) {
     isRoomCleared = false;
     
-    // Clear all pickups from previous room
-    weaponPickups.clear(true, true);
-    healthPickups.clear(true, true);
+    // Clear all pickups from previous room (with proper cleanup)
+    if (weaponPickups) {
+        weaponPickups.children.entries.forEach(pickup => {
+            if (pickup) {
+                // Stop any tweens on the pickup
+                if (pickup.tween) {
+                    pickup.tween.stop();
+                    pickup.tween = null;
+                }
+                // Destroy label if exists
+                if (pickup.label) {
+                    pickup.label.destroy();
+                    pickup.label = null;
+                }
+            }
+        });
+        weaponPickups.clear(true, true);
+    }
+    
+    if (healthPickups) {
+        healthPickups.children.entries.forEach(pickup => {
+            if (pickup && pickup.tween) {
+                pickup.tween.stop();
+                pickup.tween = null;
+            }
+        });
+        healthPickups.clear(true, true);
+    }
+    
     stopLaser();
     
-    // Clear all enemies
-    enemies.clear(true, true);
+    // Clear all enemies (with proper health bar cleanup)
+    if (enemies) {
+        enemies.children.entries.forEach(enemy => {
+            if (enemy && enemy.healthBar) {
+                if (enemyHealthBars && enemyHealthBars.contains(enemy.healthBar)) {
+                    enemyHealthBars.remove(enemy.healthBar);
+                }
+                enemy.healthBar.destroy();
+                enemy.healthBar = null;
+                enemy.healthBarFill = null;
+            }
+            if (enemy && enemy.bossLabel) {
+                enemy.bossLabel.destroy();
+                enemy.bossLabel = null;
+            }
+        });
+        enemies.clear(true, true);
+    }
     enemyStates.clear();
     
     // Spawn enemies in each room
@@ -3590,6 +3791,9 @@ function hitEnemy(bullet, enemy) {
     }
     enemy.isHit = true; // Trigger hit flash
     
+    // Create blood spray effect
+    createBloodSpray(enemy.x, enemy.y, bullet.x, bullet.y);
+    
     // Debug for boss
     if (enemy.isBoss) {
         const healthPercent = (enemy.health / enemy.maxHealth * 100).toFixed(1);
@@ -3668,14 +3872,20 @@ function killEnemy(enemy) {
         dropEnemyLoot(gameScene, enemyX, enemyY, isBoss);
     }
     
-    // Remove health bar
+    // Remove health bar from container first, then destroy
     if (enemy.healthBar) {
+        if (enemyHealthBars && enemyHealthBars.contains(enemy.healthBar)) {
+            enemyHealthBars.remove(enemy.healthBar);
+        }
         enemy.healthBar.destroy();
+        enemy.healthBar = null;
+        enemy.healthBarFill = null;
     }
     
     // Remove boss label if it exists
     if (enemy.bossLabel) {
         enemy.bossLabel.destroy();
+        enemy.bossLabel = null;
     }
     
     // Remove enemy from states
@@ -3740,15 +3950,18 @@ function dropAugmentPickup(scene, x, y) {
     // Make sure pickup is interactive and can be picked up
     pickup.setInteractive();
     
-    // Add glow/pulse animation
-    scene.tweens.add({
+    // Add glow/pulse animation (store reference for cleanup)
+    pickup.tween = scene.tweens.add({
         targets: pickup,
         scaleX: 2.2,
         scaleY: 2.2,
         alpha: 0.7,
         duration: 600,
         yoyo: true,
-        repeat: -1
+        repeat: -1,
+        onComplete: () => {
+            pickup.tween = null;
+        }
     });
     
     // Add label showing augment icon
@@ -4598,6 +4811,16 @@ function cleanupGameState() {
     if (healthPickups) healthPickups.clear(true, true);
     stopLaser();
     
+    // Clear blood stains
+    if (bloodStains) {
+        bloodStains.forEach(stain => {
+            if (stain && stain.active) {
+                stain.destroy();
+            }
+        });
+        bloodStains = [];
+    }
+    
     // Clean up game over screen
     if (gameOverText) {
         gameOverText.destroy();
@@ -4720,8 +4943,25 @@ function restartGame() {
 }
 
 function updateHealthBars(scene, time) {
-    enemies.children.entries.forEach(enemy => {
-        if (!enemy.active || !enemy.healthBar || !enemy.healthBarFill) {
+    // Create a copy of the array to avoid issues with modifications during iteration
+    const enemiesList = enemies.children.entries.slice();
+    
+    enemiesList.forEach(enemy => {
+        if (!enemy || !enemy.active || !enemy.healthBar || !enemy.healthBarFill) {
+            // Clean up orphaned health bars
+            if (enemy && enemy.healthBar && !enemy.active) {
+                if (enemyHealthBars && enemyHealthBars.contains(enemy.healthBar)) {
+                    enemyHealthBars.remove(enemy.healthBar);
+                }
+                enemy.healthBar.destroy();
+                enemy.healthBar = null;
+                enemy.healthBarFill = null;
+            }
+            return;
+        }
+        
+        // Verify health bar still exists and is valid
+        if (!enemy.healthBar.active || !enemy.healthBar.scene) {
             return;
         }
         
@@ -4832,13 +5072,115 @@ function createCyberpunkBackground(scene) {
 // ========== POLISH FUNCTIONS ==========
 
 function addScreenShake(intensity, duration = 200) {
-    // Screen shake disabled - setOffset not available in Phaser 3.80
-    return;
+    if (!gameScene) return;
+    // Add or extend shake
+    if (cameraShake.duration <= 0) {
+        cameraShake.startTime = gameScene.time.now;
+    }
+    cameraShake.intensity = Math.max(cameraShake.intensity, intensity);
+    cameraShake.duration = Math.max(cameraShake.duration, duration);
 }
 
 function updateScreenShake(scene) {
-    // Screen shake disabled - setOffset not available in Phaser 3.80
-    return;
+    if (!scene || !scene.cameras) return;
+    
+    const currentTime = scene.time.now;
+    if (cameraShake.duration > 0 && cameraShake.startTime) {
+        const elapsed = currentTime - cameraShake.startTime;
+        if (elapsed < cameraShake.duration) {
+            const progress = elapsed / cameraShake.duration;
+            const shakeAmount = cameraShake.intensity * (1 - progress);
+            
+            // Get current camera position (may have changed due to room transitions)
+            const currentScrollX = scene.cameras.main.scrollX;
+            const currentScrollY = scene.cameras.main.scrollY;
+            
+            // Apply random offset (subtract previous offset first to prevent accumulation)
+            const prevOffsetX = cameraShake.offsetX || 0;
+            const prevOffsetY = cameraShake.offsetY || 0;
+            cameraShake.offsetX = (Math.random() - 0.5) * shakeAmount;
+            cameraShake.offsetY = (Math.random() - 0.5) * shakeAmount;
+            
+            // Apply shake to camera (remove old offset, add new one)
+            scene.cameras.main.setScroll(
+                currentScrollX - prevOffsetX + cameraShake.offsetX,
+                currentScrollY - prevOffsetY + cameraShake.offsetY
+            );
+        } else {
+            // Shake finished - remove offset
+            const prevOffsetX = cameraShake.offsetX || 0;
+            const prevOffsetY = cameraShake.offsetY || 0;
+            scene.cameras.main.setScroll(
+                scene.cameras.main.scrollX - prevOffsetX,
+                scene.cameras.main.scrollY - prevOffsetY
+            );
+            cameraShake.intensity = 0;
+            cameraShake.duration = 0;
+            cameraShake.offsetX = 0;
+            cameraShake.offsetY = 0;
+            cameraShake.startTime = 0;
+        }
+    }
+}
+
+function startReload() {
+    if (isReloading || currentAmmo >= maxAmmo) return;
+    isReloading = true;
+    reloadTime = gameScene.time.now + (currentWeapon.reloadTime || 1000);
+    if (weaponText) {
+        weaponText.setText(`WEAPON: ${currentWeapon.name} (RELOADING...)`);
+    }
+}
+
+function createBloodSpray(hitX, hitY, bulletX, bulletY) {
+    if (!gameScene) return;
+    
+    // Calculate angle from bullet to enemy (blood sprays opposite direction)
+    const angle = Phaser.Math.Angle.Between(bulletX, bulletY, hitX, hitY);
+    
+    // Create blood particles
+    const particleCount = Phaser.Math.Between(5, 10);
+    for (let i = 0; i < particleCount; i++) {
+        const particle = gameScene.add.sprite(hitX, hitY, 'bloodParticle');
+        particle.setScale(Phaser.Math.FloatBetween(0.5, 1.5));
+        particle.setDepth(15);
+        
+        // Random angle variation
+        const spreadAngle = angle + Phaser.Math.FloatBetween(-0.5, 0.5);
+        const speed = Phaser.Math.Between(50, 150);
+        const vx = Math.cos(spreadAngle) * speed;
+        const vy = Math.sin(spreadAngle) * speed;
+        
+        // Animate particle
+        gameScene.tweens.add({
+            targets: particle,
+            x: hitX + vx * 0.1,
+            y: hitY + vy * 0.1,
+            alpha: 0,
+            scale: particle.scale * 0.5,
+            duration: Phaser.Math.Between(300, 600),
+            ease: 'Power2',
+            onComplete: () => {
+                particle.destroy();
+            }
+        });
+    }
+    
+    // Create blood stain on ground (lingers)
+    const stain = gameScene.add.sprite(hitX, hitY, 'bloodStain');
+    stain.setScale(Phaser.Math.FloatBetween(0.8, 1.5));
+    stain.setDepth(1); // Below enemies but above floor
+    stain.setAlpha(Phaser.Math.FloatBetween(0.6, 0.9));
+    stain.setRotation(Phaser.Math.FloatBetween(0, Math.PI * 2));
+    bloodStains.push(stain);
+    
+    // Limit blood stains to prevent memory issues (keep last 100)
+    if (bloodStains.length > 100) {
+        const oldStain = bloodStains.shift();
+        if (oldStain && oldStain.active) {
+            oldStain.destroy();
+        }
+    }
 }
 
 function showDamageNumber(x, y, damage, color = 0xffffff) {
