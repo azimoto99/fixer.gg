@@ -4891,9 +4891,9 @@ function cleanupGameState() {
     }
     
     // Destroy all game objects if they exist
-    if (bullets) bullets.clear(true, true);
-    if (enemyBullets) enemyBullets.clear(true, true);
-    if (enemies) {
+    if (bullets && bullets.clear) bullets.clear(true, true);
+    if (enemyBullets && enemyBullets.clear) enemyBullets.clear(true, true);
+    if (enemies && enemies.children && enemies.children.entries) {
         // Clean up individual enemy health bars before clearing enemies
         enemies.children.entries.forEach(enemy => {
             if (enemy && enemy.healthBar) {
@@ -4910,8 +4910,8 @@ function cleanupGameState() {
         });
         enemies.clear(true, true);
     }
-    if (enemyHealthBars) enemyHealthBars.removeAll(true);
-    if (weaponPickups) {
+    if (enemyHealthBars && enemyHealthBars.removeAll) enemyHealthBars.removeAll(true);
+    if (weaponPickups && weaponPickups.children && weaponPickups.children.entries) {
         // Clean up individual weapon pickups to prevent orphaned augment icons
         weaponPickups.children.entries.forEach(pickup => {
             if (pickup && pickup.label) {
@@ -4920,7 +4920,7 @@ function cleanupGameState() {
         });
         weaponPickups.clear(true, true);
     }
-    if (healthPickups) healthPickups.clear(true, true);
+    if (healthPickups && healthPickups.clear) healthPickups.clear(true, true);
     stopLaser();
     
     // Clear blood stains
@@ -5626,11 +5626,11 @@ function cleanupOrphanedElements() {
     if (!gameScene) return;
     
     // Clean up orphaned health bars
-    if (enemyHealthBars) {
+    if (enemyHealthBars && enemyHealthBars.children && enemyHealthBars.children.entries) {
         enemyHealthBars.children.entries.forEach(healthBar => {
             // Check if health bar has a valid parent enemy
             let hasValidParent = false;
-            if (enemies) {
+            if (enemies && enemies.children && enemies.children.entries) {
                 enemies.children.entries.forEach(enemy => {
                     if (enemy && enemy.healthBar === healthBar) {
                         hasValidParent = true;
@@ -5649,7 +5649,7 @@ function cleanupOrphanedElements() {
     }
     
     // Clean up orphaned augment pickup labels and icons
-    if (weaponPickups) {
+    if (weaponPickups && weaponPickups.children && weaponPickups.children.entries) {
         weaponPickups.children.entries.forEach(pickup => {
             // Clean up any floating labels without valid pickups
             if (pickup && pickup.label && (!pickup.active || pickup.body === null)) {
