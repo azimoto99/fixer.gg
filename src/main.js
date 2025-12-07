@@ -646,15 +646,39 @@ class GameScene extends Phaser.Scene {
         baseFireRate = 150 / char.stats.fireRate;
         baseBulletSpeed = 600 * char.stats.bulletSpeed;
         
-        // Update player sprite color based on character
+        // Update player sprite color based on character (humanoid version)
         const playerGraphics = this.add.graphics();
+        const centerX = 16;
+        const centerY = 20;
+        
+        // Head (circle)
+        playerGraphics.fillStyle(0xffdbac, 1); // Skin tone
+        playerGraphics.fillCircle(centerX, centerY - 8, 6);
+        playerGraphics.lineStyle(1, 0x000000, 0.3);
+        playerGraphics.strokeCircle(centerX, centerY - 8, 6);
+        
+        // Body (rectangle/torso) - colored by character
         playerGraphics.fillStyle(char.color, 1);
-        playerGraphics.fillCircle(16, 16, 16);
-        playerGraphics.fillStyle(0xffffff, 0.5);
-        playerGraphics.fillCircle(16, 16, 12);
-        playerGraphics.lineStyle(2, char.color, 1);
-        playerGraphics.strokeCircle(16, 16, 16);
-        playerGraphics.generateTexture('player', 32, 32);
+        playerGraphics.fillRect(centerX - 5, centerY - 2, 10, 12);
+        playerGraphics.lineStyle(1, 0x000000, 0.3);
+        playerGraphics.strokeRect(centerX - 5, centerY - 2, 10, 12);
+        
+        // Arms
+        playerGraphics.fillStyle(0xffdbac, 1); // Skin tone
+        playerGraphics.fillRect(centerX - 8, centerY, 3, 8); // Left arm
+        playerGraphics.fillRect(centerX + 5, centerY, 3, 8); // Right arm
+        
+        // Legs
+        playerGraphics.fillStyle(0x333333, 1); // Dark pants
+        playerGraphics.fillRect(centerX - 4, centerY + 10, 3, 8); // Left leg
+        playerGraphics.fillRect(centerX + 1, centerY + 10, 3, 8); // Right leg
+        
+        // Feet
+        playerGraphics.fillStyle(0x000000, 1);
+        playerGraphics.fillRect(centerX - 5, centerY + 18, 4, 2); // Left foot
+        playerGraphics.fillRect(centerX + 1, centerY + 18, 4, 2); // Right foot
+        
+        playerGraphics.generateTexture('player', 32, 40);
         
         // Continue with existing create logic...
         gameScene = this;
@@ -695,11 +719,11 @@ class GameScene extends Phaser.Scene {
         const firstRoom = mapRooms[0];
         player = this.physics.add.sprite(firstRoom.centerX, firstRoom.centerY, 'player');
         player.setCollideWorldBounds(true);
-        player.setScale(1.5);
+        player.setScale(1.2); // Slightly smaller scale since humanoid sprite is taller
         player.setDepth(10);
         
-        // Polish: Add subtle glow effect to player
-        const playerGlow = this.add.circle(firstRoom.centerX, firstRoom.centerY, 20, char.color, 0.2);
+        // Polish: Add subtle glow effect to player (slightly larger for humanoid)
+        const playerGlow = this.add.circle(firstRoom.centerX, firstRoom.centerY, 25, char.color, 0.2);
         playerGlow.setDepth(9);
         player.glow = playerGlow;
         
@@ -1111,13 +1135,31 @@ class GameScene extends Phaser.Scene {
             updateLaserBeam(this);
         }
         
-        // Health regeneration (Synthetic Blood mutation)
+        // Health regeneration (from augments)
         if (time > healthRegenTimer) {
-            const regenAmount = getMutationValue('healthRegen');
+            let regenAmount = getMutationValue('healthRegen');
+            // Also check augments directly
+            activeAugments.forEach(augment => {
+                if (augment.type === 'regen' && typeof augment.value === 'number') {
+                    regenAmount += augment.value;
+                }
+            });
             if (regenAmount > 0 && playerHealth < playerMaxHealth) {
                 playerHealth = Math.min(playerMaxHealth, playerHealth + regenAmount);
                 healthRegenTimer = time + 1000;
             }
+        }
+        
+        // Player shield augment (block first hit every X seconds)
+        if (activeAugments) {
+            activeAugments.forEach(augment => {
+                if (augment.type === 'shield' && typeof augment.value === 'number') {
+                    if (!player.shieldCooldown) {
+                        player.shieldCooldown = 0;
+                        player.shieldActive = true;
+                    }
+                }
+            });
         }
         
         // Update player speed with mutations
@@ -1355,11 +1397,18 @@ function shoot(scene, time) {
             // Check for bullet size augment
             let bulletScale = 1;
             activeAugments.forEach(augment => {
-                if (augment.type === 'bulletSize') {
+                if (augment.type === 'bulletSize' && typeof augment.value === 'number') {
                     bulletScale *= (1 + augment.value);
                 }
             });
             bullet.setScale(bulletScale);
+            
+            // Also update bullet body size to match visual scale
+            if (bullet.body) {
+                const baseSize = 8; // Base bullet size
+                const newSize = baseSize * bulletScale;
+                bullet.body.setSize(newSize, newSize);
+            }
             
             // Check for critical strike
             let finalDamage = currentWeapon.damage * damageMultiplier;
@@ -2071,21 +2120,66 @@ function generateProceduralMap(numRooms = 8) {
     }
     
     // Create connections between adjacent rooms (grid-based)
+    // First, create a map of room positions for easier lookup
+    const roomPositionMap = new Map();
+    rooms.forEach((room, index) => {
+        const row = Math.floor(index / gridCols);
+        const col = index % gridCols;
+        roomPositionMap.set(`${row},${col}`, index);
+    });
+    
+    // Now connect rooms based on their grid positions
     for (let i = 0; i < rooms.length; i++) {
         const room = rooms[i];
         const row = Math.floor(i / gridCols);
         const col = i % gridCols;
         
-        // Connect to room to the right
-        if (col < gridCols - 1 && i + 1 < rooms.length) {
-            room.connections.push(i + 1);
-            rooms[i + 1].connections.push(i);
+        // Connect to room to the right (if it exists)
+        const rightKey = `${row},${col + 1}`;
+        if (roomPositionMap.has(rightKey)) {
+            const rightIndex = roomPositionMap.get(rightKey);
+            if (!room.connections.includes(rightIndex)) {
+                room.connections.push(rightIndex);
+            }
+            if (!rooms[rightIndex].connections.includes(i)) {
+                rooms[rightIndex].connections.push(i);
+            }
         }
         
-        // Connect to room below
-        if (row < gridRows - 1 && i + gridCols < rooms.length) {
-            room.connections.push(i + gridCols);
-            rooms[i + gridCols].connections.push(i);
+        // Connect to room below (if it exists)
+        const belowKey = `${row + 1},${col}`;
+        if (roomPositionMap.has(belowKey)) {
+            const belowIndex = roomPositionMap.get(belowKey);
+            if (!room.connections.includes(belowIndex)) {
+                room.connections.push(belowIndex);
+            }
+            if (!rooms[belowIndex].connections.includes(i)) {
+                rooms[belowIndex].connections.push(i);
+            }
+        }
+        
+        // Also connect to room to the left (if it exists) - bidirectional
+        const leftKey = `${row},${col - 1}`;
+        if (roomPositionMap.has(leftKey)) {
+            const leftIndex = roomPositionMap.get(leftKey);
+            if (!room.connections.includes(leftIndex)) {
+                room.connections.push(leftIndex);
+            }
+            if (!rooms[leftIndex].connections.includes(i)) {
+                rooms[leftIndex].connections.push(i);
+            }
+        }
+        
+        // Also connect to room above (if it exists) - bidirectional
+        const aboveKey = `${row - 1},${col}`;
+        if (roomPositionMap.has(aboveKey)) {
+            const aboveIndex = roomPositionMap.get(aboveKey);
+            if (!room.connections.includes(aboveIndex)) {
+                room.connections.push(aboveIndex);
+            }
+            if (!rooms[aboveIndex].connections.includes(i)) {
+                rooms[aboveIndex].connections.push(i);
+            }
         }
     }
     
@@ -2723,8 +2817,9 @@ function spawnEnemiesInRoom(scene, room, count) {
         // Get random sprite index (0-4)
         const spriteIndex = Phaser.Math.Between(0, 4);
         const enemy = scene.physics.add.sprite(spawnX, spawnY, `enemy_${spriteIndex}`);
-        enemy.setScale(1.2);
+        enemy.setScale(1.0); // Humanoid sprites are already properly sized
         enemy.setDepth(10);
+        // Tint the body part only (sprite already has color, tint adds variation)
         enemy.setTint(enemyTypeDef.color);
         
         // Apply floor scaling
@@ -2840,10 +2935,10 @@ function spawnBoss(scene, room) {
     const spawnX = room.centerX;
     const spawnY = room.centerY;
     
-    const boss = scene.physics.add.sprite(spawnX, spawnY, `enemy_${Phaser.Math.Between(0, 4)}`);
-    boss.setScale(2.0); // Boss is bigger
+    const boss = scene.physics.add.sprite(spawnX, spawnY, 'boss');
+    boss.setScale(1.5); // Boss is bigger (sprite is already larger)
     boss.setDepth(10);
-    boss.setTint(0xff0000); // Red boss
+    // Boss sprite already has red coloring, no need to tint
     
     // Ensure boss has proper collision body for scaled sprite
     boss.setCollideWorldBounds(true);
@@ -3400,7 +3495,7 @@ function spawnEnemies(scene, count) {
         
         // Enemy properties
         enemy.setCollideWorldBounds(true);
-        enemy.setScale(1.2);
+        enemy.setScale(1.0); // Humanoid sprites are already properly sized
         enemy.setDepth(5); // Ensure enemies are visible
         enemy.maxHealth = Phaser.Math.Between(10, 20);
         enemy.health = enemy.maxHealth;
@@ -3478,6 +3573,22 @@ function hitEnemy(bullet, enemy) {
         for (let i = 0; i < activeAugments.length; i++) {
             if (activeAugments[i].type === 'lifesteal') {
                 playerHealth = Math.min(playerMaxHealth, playerHealth + Math.floor(damage * activeAugments[i].value));
+            }
+        }
+    }
+    
+    // Knockback augment - push enemy back
+    if (activeAugments && activeAugments.length > 0) {
+        for (let i = 0; i < activeAugments.length; i++) {
+            if (activeAugments[i].type === 'knockback' && activeAugments[i].value === true) {
+                if (enemy.body && enemy.body.enable) {
+                    const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, bullet.x, bullet.y);
+                    const knockbackForce = 200;
+                    enemy.body.setVelocity(
+                        Math.cos(angle) * knockbackForce,
+                        Math.sin(angle) * knockbackForce
+                    );
+                }
             }
         }
     }
@@ -3573,14 +3684,14 @@ function dropEnemyLoot(scene, x, y, isBoss) {
     if (roll < 0.02) {
         // 2% chance to drop augment
         dropAugmentPickup(scene, x, y);
-    } else if (roll < 0.10) {
-        // 8% chance to drop weapon
+    } else if (roll < 0.15) {
+        // 13% chance to drop weapon (increased from 8%)
         dropWeapon(scene, x, y);
-    } else if (roll < 0.25) {
+    } else if (roll < 0.30) {
         // 15% chance to drop health
         dropHealthPack(scene, x, y);
     }
-    // 75% chance to drop nothing
+    // 70% chance to drop nothing
 }
 
 // Drop an augment pickup
@@ -3592,7 +3703,14 @@ function dropAugmentPickup(scene, x, y) {
     
     // Get a random augment for this pickup
     const randomAugments = getRandomAugments(1);
+    if (randomAugments.length === 0) {
+        pickup.destroy();
+        return;
+    }
     pickup.augment = randomAugments[0];
+    
+    // Make sure pickup is interactive and can be picked up
+    pickup.setInteractive();
     
     // Add glow/pulse animation
     scene.tweens.add({
