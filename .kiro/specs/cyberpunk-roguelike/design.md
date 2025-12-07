@@ -46,7 +46,7 @@ Game Engine (Phaser.js 3)
 
 ### Player Component
 
-The player is the central entity controlled by the user, featuring movement, combat, and progression capabilities.
+The player is the central entity controlled by the user, featuring movement, combat, progression capabilities, and character-specific special powers.
 
 **Properties:**
 - Position (x, y coordinates)
@@ -56,6 +56,9 @@ The player is the central entity controlled by the user, featuring movement, com
 - Active weapon reference
 - Augment collection
 - Invincibility timer for damage protection
+- Character class reference
+- Special power cooldown timer
+- Active special power effects
 
 **Methods:**
 - `update()` - Handle input, movement, and rotation
@@ -64,6 +67,8 @@ The player is the central entity controlled by the user, featuring movement, com
 - `heal(amount)` - Restore health up to maximum
 - `addAugment(augment)` - Apply augment effects
 - `switchWeapon(index)` - Change active weapon
+- `activateSpecialPower()` - Trigger character-specific special ability
+- `updateSpecialPowerEffects()` - Handle ongoing special power effects
 
 ### Enemy Component
 
@@ -166,6 +171,90 @@ class FloorGenerator {
     // 3. Ensure clear paths to doors
     // 4. Define enemy spawn points
     // 5. Return room layout data
+  }
+}
+```
+
+### Character Special Powers System
+
+Each character class has a unique special power activated by right-click, providing distinct tactical options and enhancing character identity.
+
+**Special Power Interface:**
+```javascript
+class SpecialPower {
+  constructor(name, cooldown, duration, effect) {
+    this.name = name;
+    this.cooldown = cooldown; // milliseconds
+    this.duration = duration; // milliseconds (0 for instant)
+    this.effect = effect; // function to execute
+    this.lastUsed = 0;
+    this.isActive = false;
+  }
+  
+  canActivate() {
+    return Date.now() - this.lastUsed >= this.cooldown;
+  }
+  
+  activate(player, scene) {
+    if (!this.canActivate()) return false;
+    this.lastUsed = Date.now();
+    this.effect(player, scene);
+    return true;
+  }
+}
+```
+
+**Character Special Powers:**
+
+- **Fixer - "Ghost Protocol":** 
+  - Effect: 2 seconds of invincibility with 50% transparency
+  - Cooldown: 15 seconds
+  - Visual: Cyan glow and flickering sprite
+
+- **Reaper - "Shadow Strike":**
+  - Effect: Teleport to mouse position, deal 50 area damage in 100px radius
+  - Cooldown: 12 seconds  
+  - Visual: Dark particle trail and explosion effect
+
+- **Tank - "Aegis Shield":**
+  - Effect: 3 seconds of complete damage immunity with visible shield
+  - Cooldown: 20 seconds
+  - Visual: Blue energy shield surrounding player
+
+- **Scout - "Overdrive":**
+  - Effect: 4 seconds of 3x movement speed and fire rate
+  - Cooldown: 18 seconds
+  - Visual: Green speed lines and rapid muzzle flashes
+
+- **Sniper - "Piercing Shot":**
+  - Effect: Single shot that penetrates all enemies and walls
+  - Cooldown: 10 seconds
+  - Visual: Bright yellow laser beam with screen shake
+
+- **Berserker - "Blood Rage":**
+  - Effect: 5 seconds of 2x damage and speed, screen tint red
+  - Cooldown: 25 seconds
+  - Visual: Red particle aura and screen overlay
+
+**Special Power UI System:**
+```javascript
+class SpecialPowerUI {
+  constructor(scene, power) {
+    this.scene = scene;
+    this.power = power;
+    this.cooldownDisplay = null;
+    this.icon = null;
+  }
+  
+  update() {
+    const remaining = this.power.getRemainingCooldown();
+    if (remaining > 0) {
+      this.cooldownDisplay.setText(Math.ceil(remaining / 1000));
+      this.icon.setTint(0x666666);
+    } else {
+      this.cooldownDisplay.setText('');
+      this.icon.clearTint();
+    }
   }
 }
 ```

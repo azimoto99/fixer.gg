@@ -216,10 +216,73 @@
     - Test game loading and performance on different devices
     - _Requirements: 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 14. Final integration and deployment preparation
+- [ ] 14. Implement character special powers system
+  - [ ] 14.1 Create special power framework and base classes
+    - Write SpecialPower base class with cooldown, duration, and effect properties
+    - Create special power activation system with right-click input detection
+    - Implement cooldown tracking and validation system
+    - Add special power UI elements (icon and cooldown display)
+    - _Requirements: 12.1, 12.2, 12.3_
+
+  - [ ] 14.2 Implement Fixer "Ghost Protocol" special power
+    - Create 2-second invincibility effect with visual transparency
+    - Add cyan glow particle effect around player during activation
+    - Implement 15-second cooldown system
+    - Test invincibility against all damage sources
+    - _Requirements: 12.4_
+
+  - [ ] 14.3 Implement Reaper "Shadow Strike" special power
+    - Create teleportation system to mouse cursor position
+    - Add 50 area damage in 100px radius at teleport destination
+    - Implement dark particle trail effect during teleport
+    - Add explosion visual effect at destination
+    - Set 12-second cooldown period
+    - _Requirements: 12.5_
+
+  - [ ] 14.4 Implement Tank "Aegis Shield" special power
+    - Create 3-second complete damage immunity system
+    - Add visible blue energy shield sprite around player
+    - Implement shield visual effects and animations
+    - Set 20-second cooldown period
+    - Test shield effectiveness against all damage types
+    - _Requirements: 12.6_
+
+  - [ ] 14.5 Implement Scout "Overdrive" special power
+    - Create 4-second speed and fire rate multiplier (3x)
+    - Add green speed line particle effects
+    - Implement enhanced muzzle flash effects during overdrive
+    - Set 18-second cooldown period
+    - Test movement and shooting speed increases
+    - _Requirements: 12.7_
+
+  - [ ] 14.6 Implement Sniper "Piercing Shot" special power
+    - Create piercing bullet that penetrates all enemies and walls
+    - Add bright yellow laser beam visual effect
+    - Implement screen shake effect on activation
+    - Set 10-second cooldown period
+    - Test penetration through multiple targets and obstacles
+    - _Requirements: 12.8_
+
+  - [ ] 14.7 Implement Berserker "Blood Rage" special power
+    - Create 5-second damage and speed multiplier (2x)
+    - Add red particle aura effect around player
+    - Implement red screen tint overlay during rage
+    - Set 25-second cooldown period
+    - Test damage and speed increases during rage mode
+    - _Requirements: 12.9_
+
+  - [ ] 14.8 Add special power UI and visual feedback
+    - Create special power icon display in UI corner
+    - Implement cooldown timer text display
+    - Add visual feedback for power availability (icon tinting)
+    - Create particle effects and screen effects for each power
+    - Test UI responsiveness and visual clarity
+    - _Requirements: 12.10, 12.11_
+
+- [ ] 15. Final integration and deployment preparation
   - Create single HTML file build with all assets bundled
   - Add meta tags for proper web deployment (title, description, Open Graph)
   - Test complete game flow from start to victory/game over
   - Verify all requirements are met through comprehensive testing
   - Prepare deployment package for web hosting
-  - _Requirements: 12.2, 12.6_
+  - _Requirements: 13.2, 13.6_

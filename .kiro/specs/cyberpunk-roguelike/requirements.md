@@ -148,7 +148,25 @@ This document outlines the requirements for a cyberpunk-themed roguelike game - 
 5. WHEN significant events occur THEN appropriate particle effects SHALL enhance the visual experience
 6. IF audio is implemented THEN sound effects SHALL accompany major game actions
 
-### Requirement 12: Performance and Technical Requirements
+### Requirement 12: Character Special Powers System
+
+**User Story:** As a player, I want each character class to have a unique special power activated by right-click, so that each character feels distinct and provides different tactical options.
+
+#### Acceptance Criteria
+
+1. WHEN the player right-clicks THEN the system SHALL activate the current character's special power if available
+2. WHEN a special power is activated THEN it SHALL have a cooldown period before it can be used again
+3. WHEN a special power is on cooldown THEN the UI SHALL display the remaining cooldown time
+4. WHEN the Fixer uses their special power THEN they SHALL gain temporary invincibility for 2 seconds
+5. WHEN the Reaper uses their special power THEN they SHALL teleport to the mouse cursor position and deal area damage
+6. WHEN the Tank uses their special power THEN they SHALL create a temporary shield that blocks all damage for 3 seconds
+7. WHEN the Scout uses their special power THEN they SHALL gain 3x movement speed and fire rate for 4 seconds
+8. WHEN the Sniper uses their special power THEN they SHALL fire a piercing shot that goes through all enemies and walls
+9. WHEN the Berserker uses their special power THEN they SHALL enter rage mode with 2x damage and speed for 5 seconds
+10. IF a special power has visual effects THEN they SHALL be clearly visible and match the cyberpunk aesthetic
+11. IF a special power affects gameplay THEN the effects SHALL be immediately noticeable and impactful
+
+### Requirement 13: Performance and Technical Requirements
 
 **User Story:** As a player, I want the game to run smoothly across different devices and browsers, so that I can enjoy consistent gameplay.
 

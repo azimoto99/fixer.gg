@@ -345,6 +345,61 @@ class CharacterSelectScene extends Phaser.Scene {
         super({ key: 'CharacterSelectScene' });
     }
 
+    preload() {
+        // Create character preview sprites for selection screen
+        const characterKeys = Object.keys(characters);
+        
+        characterKeys.forEach(charKey => {
+            const char = characters[charKey];
+            
+            // Create character preview sprite for selection screen
+            const previewG = this.add.graphics();
+            const pCenterX = 30;
+            const pCenterY = 30;
+            
+            // Head
+            previewG.fillStyle(0xffdbac, 1);
+            previewG.fillCircle(pCenterX, pCenterY - 12, 10);
+            previewG.lineStyle(2, 0x000000, 0.3);
+            previewG.strokeCircle(pCenterX, pCenterY - 12, 10);
+            
+            // Hair (character-specific)
+            let hairColor = 0x4a3728;
+            if (charKey === 'reaper') hairColor = 0x000000;
+            else if (charKey === 'tank') hairColor = 0x666666;
+            else if (charKey === 'scout') hairColor = 0xffd700;
+            else if (charKey === 'sniper') hairColor = 0x8b4513;
+            else if (charKey === 'berserker') hairColor = 0xff4500;
+            
+            previewG.fillStyle(hairColor, 1);
+            previewG.fillCircle(pCenterX, pCenterY - 18, 8);
+            
+            // Body (character color)
+            previewG.fillStyle(char.color, 1);
+            previewG.fillCircle(pCenterX, pCenterY, 8);
+            
+            // Arms
+            previewG.fillStyle(0xffdbac, 1);
+            previewG.fillRect(pCenterX - 12, pCenterY - 3, 4, 8);
+            previewG.fillRect(pCenterX + 8, pCenterY - 3, 4, 8);
+            
+            // Character-specific details (larger for preview)
+            if (charKey === 'tank') {
+                previewG.fillStyle(0x404040, 0.8);
+                previewG.fillRect(pCenterX - 3, pCenterY - 5, 6, 12);
+            } else if (charKey === 'reaper') {
+                previewG.fillStyle(0x1a1a1a, 0.7);
+                previewG.fillCircle(pCenterX, pCenterY - 15, 12);
+            } else if (charKey === 'scout') {
+                previewG.fillStyle(0x00ff00, 0.6);
+                previewG.fillCircle(pCenterX - 4, pCenterY - 12, 3);
+                previewG.fillCircle(pCenterX + 4, pCenterY - 12, 3);
+            }
+            
+            previewG.generateTexture(`${charKey}_preview`, 60, 60);
+        });
+    }
+
     create() {
         // Background
         this.add.image(400, 300, 'menuBg');
@@ -586,52 +641,6 @@ class GameScene extends Phaser.Scene {
                 
                 g.generateTexture(`${charKey}_${weaponType}`, 32, 40);
             });
-            
-            // Create character preview sprite for selection screen
-            const previewG = this.add.graphics();
-            const pCenterX = 30;
-            const pCenterY = 30;
-            
-            // Head
-            previewG.fillStyle(0xffdbac, 1);
-            previewG.fillCircle(pCenterX, pCenterY - 12, 10);
-            previewG.lineStyle(2, 0x000000, 0.3);
-            previewG.strokeCircle(pCenterX, pCenterY - 12, 10);
-            
-            // Hair (character-specific)
-            let hairColor = 0x4a3728;
-            if (charKey === 'reaper') hairColor = 0x000000;
-            else if (charKey === 'tank') hairColor = 0x666666;
-            else if (charKey === 'scout') hairColor = 0xffd700;
-            else if (charKey === 'sniper') hairColor = 0x8b4513;
-            else if (charKey === 'berserker') hairColor = 0xff4500;
-            
-            previewG.fillStyle(hairColor, 1);
-            previewG.fillCircle(pCenterX, pCenterY - 18, 8);
-            
-            // Body (character color)
-            previewG.fillStyle(char.color, 1);
-            previewG.fillCircle(pCenterX, pCenterY, 8);
-            
-            // Arms
-            previewG.fillStyle(0xffdbac, 1);
-            previewG.fillRect(pCenterX - 12, pCenterY - 3, 4, 8);
-            previewG.fillRect(pCenterX + 8, pCenterY - 3, 4, 8);
-            
-            // Character-specific details (larger for preview)
-            if (charKey === 'tank') {
-                previewG.fillStyle(0x404040, 0.8);
-                previewG.fillRect(pCenterX - 3, pCenterY - 5, 6, 12);
-            } else if (charKey === 'reaper') {
-                previewG.fillStyle(0x1a1a1a, 0.7);
-                previewG.fillCircle(pCenterX, pCenterY - 15, 12);
-            } else if (charKey === 'scout') {
-                previewG.fillStyle(0x00ff00, 0.6);
-                previewG.fillCircle(pCenterX - 4, pCenterY - 12, 3);
-                previewG.fillCircle(pCenterX + 4, pCenterY - 12, 3);
-            }
-            
-            previewG.generateTexture(`${charKey}_preview`, 60, 60);
         });
         
         // Default player sprite (pistol)
@@ -1146,6 +1155,9 @@ class GameScene extends Phaser.Scene {
         // Enable mouse input
         this.input.mouse.disableContextMenu();
         
+        // Initialize enhanced systems
+        initializeEnhancedSystems();
+        
         console.log('GameScene.create() completed successfully!');
         
         } catch (error) {
@@ -1159,7 +1171,20 @@ class GameScene extends Phaser.Scene {
     }
 
     update(time) {
-        if (isGameOver || isLevelUpScreen) {
+        // Handle pause input
+        const escKey = this.input.keyboard.addKey('ESC');
+        if (Phaser.Input.Keyboard.JustDown(escKey)) {
+            if (isPaused) {
+                closePauseMenu();
+            } else if (!isLevelUpScreen && !augmentSelectionActive) {
+                createPauseMenu();
+            }
+        }
+        
+        // Don't update game logic if paused
+        if (isPaused) return;
+        
+        if (isGameOver || isLevelUpScreen || augmentSelectionActive) {
             // Reset player velocity when game is paused
             if (player && player.body) {
                 player.setVelocity(0, 0);
@@ -1538,20 +1563,20 @@ function shoot(scene, time) {
     });
     
     if (currentWeapon.type === 'shotgun') {
-        // Shotgun fires multiple bullets in spread
+        // Shotgun fires multiple bullets in cone pattern
         const baseAngle = Phaser.Math.Angle.Between(
             player.x,
             player.y,
             mousePointer.worldX,
             mousePointer.worldY
         );
-        const spreadAngle = 0.4; // Total spread angle in radians (wider spread)
-        const shotgunBulletCount = currentWeapon.spread;
+        const spreadAngle = 0.6; // Wider cone spread for shotgun
+        const shotgunBulletCount = currentWeapon.spread; // Should be 7 bullets
         
         for (let i = 0; i < shotgunBulletCount; i++) {
-            // Create a proper spray pattern instead of linear spread
-            const spreadOffset = (Math.random() - 0.5) * spreadAngle;
-            const angle = baseAngle + spreadOffset;
+            // Create proper cone pattern - evenly distributed within cone
+            const angleStep = spreadAngle / (shotgunBulletCount - 1);
+            const angle = baseAngle - (spreadAngle / 2) + (i * angleStep);
             
             const bullet = bullets.get(player.x, player.y);
             if (bullet) {
@@ -2428,8 +2453,8 @@ function generateProceduralMap(numRooms = 8) {
 }
 
 function createProceduralMap(scene) {
-    // Generate map (8 rooms per floor)
-    generatedMap = generateProceduralMap(8);
+    // Generate map (16 rooms per floor for 4x4 grid)
+    generatedMap = generateProceduralMap(16);
     mapRooms = generatedMap.rooms;
     mapCorridors = generatedMap.corridors;
     
@@ -2437,14 +2462,28 @@ function createProceduralMap(scene) {
     if (!allWalls) {
         allWalls = scene.physics.add.staticGroup();
     } else {
-        allWalls.clear(true, true);
+        if (allWalls.clear && typeof allWalls.clear === 'function') {
+            try {
+                allWalls.clear(true, true);
+            } catch (e) {
+                console.log('Error clearing walls:', e);
+                allWalls = scene.physics.add.staticGroup();
+            }
+        }
     }
     
     // Create obstacles group
     if (!allObstacles) {
         allObstacles = scene.physics.add.staticGroup();
     } else {
-        allObstacles.clear(true, true);
+        if (allObstacles.clear && typeof allObstacles.clear === 'function') {
+            try {
+                allObstacles.clear(true, true);
+            } catch (e) {
+                console.log('Error clearing obstacles:', e);
+                allObstacles = scene.physics.add.staticGroup();
+            }
+        }
     }
     
     // Create room walls and floors
@@ -2613,7 +2652,14 @@ function createDoors(scene) {
     if (!allDoors) {
         allDoors = scene.physics.add.staticGroup();
     } else {
-        allDoors.clear(true, true);
+        if (allDoors.clear && typeof allDoors.clear === 'function') {
+            try {
+                allDoors.clear(true, true);
+            } catch (e) {
+                console.log('Error clearing doors:', e);
+                allDoors = scene.physics.add.staticGroup();
+            }
+        }
     }
     
     roomDoors.clear();
@@ -2784,28 +2830,28 @@ function createMinimap(scene) {
     const minimapX = 800 - minimapSize - 10;
     const minimapY = 10;
     
-    // Minimap background
+    // Minimap background (more transparent)
     const minimapBg = scene.add.rectangle(
         minimapX + minimapSize / 2,
         minimapY + minimapSize / 2,
         minimapSize,
         minimapSize,
         0x000000,
-        0.8
+        0.5  // Reduced from 0.8 to 0.5 for more transparency
     );
-    minimapBg.setDepth(250);
+    minimapBg.setDepth(300);  // Increased depth to ensure it's above enemies
     minimapBg.setScrollFactor(0); // Fixed to camera
     
     // Minimap border
     const minimapBorder = scene.add.graphics();
     minimapBorder.lineStyle(2, 0x00ffff, 1);
     minimapBorder.strokeRect(minimapX, minimapY, minimapSize, minimapSize);
-    minimapBorder.setDepth(251);
+    minimapBorder.setDepth(301);  // Higher than background
     minimapBorder.setScrollFactor(0);
     
     // Minimap graphics for drawing
     minimapGraphics = scene.add.graphics();
-    minimapGraphics.setDepth(250);
+    minimapGraphics.setDepth(302);  // Highest depth for minimap content
     minimapGraphics.setScrollFactor(0);
     
     // Minimap label
@@ -2814,7 +2860,7 @@ function createMinimap(scene) {
         fill: '#00ffff',
         fontFamily: 'Courier New'
     });
-    minimapLabel.setDepth(251);
+    minimapLabel.setDepth(301);  // Same as border
     minimapLabel.setScrollFactor(0);
 }
 
@@ -3025,8 +3071,10 @@ function startRoom(scene) {
         weaponPickups.clear(true, true);
     }
     
-    // Clean up any orphaned visual elements
-    cleanupOrphanedElements();
+    // Clean up any orphaned visual elements (only if game objects are initialized)
+    if (enemies && weaponPickups && enemyHealthBars) {
+        cleanupOrphanedElements();
+    }
     
     if (healthPickups) {
         healthPickups.children.entries.forEach(pickup => {
@@ -3672,10 +3720,10 @@ function checkRoomCleared() {
             });
         }
         
-        // If this is the boss room and boss is dead, show augment selection
+        // If this is the boss room and boss is dead, spawn stairs to next floor
         if (currentRoom.isBossRoom && currentRoomId === bossRoomId) {
             console.log(`Boss room cleared! Room ID: ${currentRoomId}, Boss Room ID: ${bossRoomId}, isBossRoom: ${currentRoom.isBossRoom}`);
-            showAugmentSelection();
+            spawnStairsToNextFloor();
         }
     }
 }
@@ -4667,7 +4715,14 @@ function hitPlayer(bullet, playerSprite) {
 function updatePlayerHealthBar() {
     if (!playerHealthBar) return;
     
-    const healthPercent = playerHealth / playerMaxHealth;
+    const healthPercent = Math.max(0, Math.min(1, playerHealth / playerMaxHealth));
+    
+    // Debug logging to see what's happening
+    if (playerHealth > 0 && healthPercent < 0.5) {
+        console.log(`Health Debug: ${playerHealth}/${playerMaxHealth} = ${healthPercent} (${Math.floor(healthPercent * 100)}%)`);
+    }
+    
+    // Use the actual health percentage without minimum scale interference
     playerHealthBar.fill.setScale(healthPercent, 1);
     
     // Change color based on health
@@ -4890,37 +4945,78 @@ function cleanupGameState() {
         closeAugmentSelection();
     }
     
-    // Destroy all game objects if they exist
-    if (bullets && bullets.clear) bullets.clear(true, true);
-    if (enemyBullets && enemyBullets.clear) enemyBullets.clear(true, true);
-    if (enemies && enemies.children && enemies.children.entries) {
-        // Clean up individual enemy health bars before clearing enemies
-        enemies.children.entries.forEach(enemy => {
-            if (enemy && enemy.healthBar) {
-                if (enemyHealthBars) {
-                    enemyHealthBars.remove(enemy.healthBar);
-                }
-                enemy.healthBar.destroy();
-                enemy.healthBar = null;
-                if (enemy.healthBarFill) {
-                    enemy.healthBarFill.destroy();
-                    enemy.healthBarFill = null;
-                }
-            }
-        });
-        enemies.clear(true, true);
+    // Destroy all game objects if they exist (with proper null checks)
+    if (bullets && bullets.clear && typeof bullets.clear === 'function') {
+        try {
+            bullets.clear(true, true);
+        } catch (e) {
+            console.log('Error clearing bullets:', e);
+        }
     }
-    if (enemyHealthBars && enemyHealthBars.removeAll) enemyHealthBars.removeAll(true);
-    if (weaponPickups && weaponPickups.children && weaponPickups.children.entries) {
-        // Clean up individual weapon pickups to prevent orphaned augment icons
-        weaponPickups.children.entries.forEach(pickup => {
-            if (pickup && pickup.label) {
-                pickup.label.destroy();
-            }
-        });
-        weaponPickups.clear(true, true);
+    
+    if (enemyBullets && enemyBullets.clear && typeof enemyBullets.clear === 'function') {
+        try {
+            enemyBullets.clear(true, true);
+        } catch (e) {
+            console.log('Error clearing enemy bullets:', e);
+        }
     }
-    if (healthPickups && healthPickups.clear) healthPickups.clear(true, true);
+    
+    try {
+        if (enemies && enemies.children && enemies.children.entries) {
+            // Clean up individual enemy health bars before clearing enemies
+            enemies.children.entries.forEach(enemy => {
+                if (enemy && enemy.healthBar) {
+                    if (enemyHealthBars) {
+                        enemyHealthBars.remove(enemy.healthBar);
+                    }
+                    enemy.healthBar.destroy();
+                    enemy.healthBar = null;
+                    if (enemy.healthBarFill) {
+                        enemy.healthBarFill.destroy();
+                        enemy.healthBarFill = null;
+                    }
+                }
+            });
+            if (enemies.clear && typeof enemies.clear === 'function') {
+                enemies.clear(true, true);
+            }
+        }
+    } catch (e) {
+        console.warn('Error clearing enemies:', e);
+    }
+    
+    try {
+        if (enemyHealthBars && enemyHealthBars.removeAll && typeof enemyHealthBars.removeAll === 'function') {
+            enemyHealthBars.removeAll(true);
+        }
+    } catch (e) {
+        console.warn('Error clearing enemy health bars:', e);
+    }
+    
+    try {
+        if (weaponPickups && weaponPickups.children && weaponPickups.children.entries) {
+            // Clean up individual weapon pickups to prevent orphaned augment icons
+            weaponPickups.children.entries.forEach(pickup => {
+                if (pickup && pickup.label) {
+                    pickup.label.destroy();
+                }
+            });
+            if (weaponPickups.clear && typeof weaponPickups.clear === 'function') {
+                weaponPickups.clear(true, true);
+            }
+        }
+    } catch (e) {
+        console.warn('Error clearing weapon pickups:', e);
+    }
+    
+    if (healthPickups && healthPickups.clear && typeof healthPickups.clear === 'function') {
+        try {
+            healthPickups.clear(true, true);
+        } catch (e) {
+            console.log('Error clearing health pickups:', e);
+        }
+    }
     stopLaser();
     
     // Clear blood stains
@@ -5671,4 +5767,331 @@ function cleanupOrphanedElements() {
             }
         });
     }
+}
+
+// Game pause system
+let isPaused = false;
+let pauseOverlay = null;
+
+// Stairs system
+let stairsToNextFloor = null;
+
+// Function to spawn stairs to next floor instead of automatic transition
+function spawnStairsToNextFloor() {
+    if (!gameScene || stairsToNextFloor) return;
+    
+    const currentRoom = mapRooms[currentRoomId];
+    if (!currentRoom) return;
+    
+    // Create stairs sprite at center of room
+    stairsToNextFloor = gameScene.physics.add.sprite(
+        currentRoom.centerX, 
+        currentRoom.centerY, 
+        'portal'
+    );
+    stairsToNextFloor.setScale(1.2);
+    stairsToNextFloor.setTint(0xffff00); // Yellow tint for stairs
+    stairsToNextFloor.setDepth(5);
+    
+    // Add glow effect
+    const stairsGlow = gameScene.add.circle(
+        currentRoom.centerX, 
+        currentRoom.centerY, 
+        30, 
+        0xffff00, 
+        0.3
+    );
+    stairsGlow.setDepth(4);
+    stairsToNextFloor.glow = stairsGlow;
+    
+    // Add text label
+    const stairsText = gameScene.add.text(
+        currentRoom.centerX, 
+        currentRoom.centerY - 50, 
+        'STAIRS TO NEXT FLOOR\nPress SPACE to use', 
+        {
+            fontSize: '16px',
+            fill: '#ffff00',
+            fontFamily: 'Courier New',
+            fontStyle: 'bold',
+            align: 'center'
+        }
+    );
+    stairsText.setOrigin(0.5);
+    stairsText.setDepth(6);
+    stairsToNextFloor.text = stairsText;
+    
+    // Add collision detection
+    gameScene.physics.add.overlap(player, stairsToNextFloor, useStairs, null, gameScene);
+    
+    console.log('Stairs to next floor spawned!');
+}
+
+// Function to use stairs (triggered by player collision + space key)
+function useStairs() {
+    if (!stairsToNextFloor || !gameScene.input.keyboard.addKey('SPACE').isDown) return;
+    
+    // Show augment selection first, then proceed to next floor
+    showAugmentSelection();
+    
+    // Clean up stairs
+    if (stairsToNextFloor) {
+        if (stairsToNextFloor.glow) stairsToNextFloor.glow.destroy();
+        if (stairsToNextFloor.text) stairsToNextFloor.text.destroy();
+        stairsToNextFloor.destroy();
+        stairsToNextFloor = null;
+    }
+}
+
+// Pause menu system
+function createPauseMenu() {
+    if (isPaused || !gameScene) return;
+    
+    isPaused = true;
+    
+    // Pause physics
+    gameScene.physics.pause();
+    
+    // Create overlay
+    pauseOverlay = gameScene.add.container(0, 0);
+    pauseOverlay.setDepth(300);
+    pauseOverlay.setScrollFactor(0);
+    
+    // Background
+    const bg = gameScene.add.rectangle(400, 300, 800, 600, 0x000000, 0.8);
+    pauseOverlay.add(bg);
+    
+    // Title
+    const title = gameScene.add.text(400, 200, 'GAME PAUSED', {
+        fontSize: '48px',
+        fill: '#00ffff',
+        fontFamily: 'Courier New',
+        fontStyle: 'bold'
+    });
+    title.setOrigin(0.5);
+    pauseOverlay.add(title);
+    
+    // Resume button
+    const resumeButton = gameScene.add.rectangle(400, 300, 200, 50, 0x00ffff);
+    resumeButton.setStrokeStyle(2, 0xffffff, 1);
+    resumeButton.setInteractive({ useHandCursor: true });
+    pauseOverlay.add(resumeButton);
+    
+    const resumeText = gameScene.add.text(400, 300, 'RESUME', {
+        fontSize: '24px',
+        fill: '#000000',
+        fontFamily: 'Courier New',
+        fontStyle: 'bold'
+    });
+    resumeText.setOrigin(0.5);
+    pauseOverlay.add(resumeText);
+    
+    // Main menu button
+    const menuButton = gameScene.add.rectangle(400, 370, 200, 50, 0x666666);
+    menuButton.setStrokeStyle(2, 0x888888, 1);
+    menuButton.setInteractive({ useHandCursor: true });
+    pauseOverlay.add(menuButton);
+    
+    const menuText = gameScene.add.text(400, 370, 'MAIN MENU', {
+        fontSize: '24px',
+        fill: '#ffffff',
+        fontFamily: 'Courier New',
+        fontStyle: 'bold'
+    });
+    menuText.setOrigin(0.5);
+    pauseOverlay.add(menuText);
+    
+    // Instructions
+    const instructions = gameScene.add.text(400, 450, 'Press ESC to resume', {
+        fontSize: '16px',
+        fill: '#888888',
+        fontFamily: 'Courier New'
+    });
+    instructions.setOrigin(0.5);
+    pauseOverlay.add(instructions);
+    
+    // Button interactions
+    resumeButton.on('pointerover', () => {
+        resumeButton.setFillStyle(0x00ffff, 0.8);
+    });
+    resumeButton.on('pointerout', () => {
+        resumeButton.setFillStyle(0x00ffff, 1);
+    });
+    resumeButton.on('pointerdown', () => {
+        closePauseMenu();
+    });
+    
+    menuButton.on('pointerover', () => {
+        menuButton.setFillStyle(0x888888, 1);
+    });
+    menuButton.on('pointerout', () => {
+        menuButton.setFillStyle(0x666666, 1);
+    });
+    menuButton.on('pointerdown', () => {
+        closePauseMenu();
+        gameScene.scene.start('MainMenuScene');
+    });
+}
+
+function closePauseMenu() {
+    if (!isPaused || !pauseOverlay) return;
+    
+    isPaused = false;
+    
+    // Resume physics
+    if (gameScene && gameScene.physics) {
+        gameScene.physics.resume();
+    }
+    
+    // Destroy overlay
+    pauseOverlay.destroy();
+    pauseOverlay = null;
+}
+
+// Enhanced weapon firing patterns
+function updateWeaponStats() {
+    // Update weapon stats for proper attack patterns
+    weapons.pistol.fireRate = 400; // Slower pistol (400ms between shots)
+    weapons.smg.fireRate = 100; // Fast burst fire
+    weapons.smg.burstSize = 3;
+    weapons.smg.burstCooldown = 1000; // 1 second between bursts
+    weapons.shotgun.fireRate = 1500; // Slower shotgun
+    weapons.shotgun.spread = 7; // 7 bullets in cone
+    weapons.laser.fireRate = 50; // Continuous beam
+}
+
+// Fix health bar display issues
+function updateHealthBar(enemy) {
+    if (!enemy || !enemy.healthBar || !enemy.healthBarFill) return;
+    
+    const healthPercent = Math.max(0, enemy.health / enemy.maxHealth);
+    const barWidth = 30;
+    const fillWidth = Math.max(1, barWidth * healthPercent); // Ensure minimum 1px width
+    
+    // Update health bar fill width
+    enemy.healthBarFill.setScale(fillWidth / barWidth, 1);
+    
+    // Change color based on health
+    if (healthPercent > 0.6) {
+        enemy.healthBarFill.setTint(0x00ff00); // Green
+    } else if (healthPercent > 0.3) {
+        enemy.healthBarFill.setTint(0xffff00); // Yellow
+    } else {
+        enemy.healthBarFill.setTint(0xff0000); // Red
+    }
+    
+    // Hide health bar if enemy is at full health
+    if (healthPercent >= 1.0) {
+        enemy.healthBar.setVisible(false);
+        enemy.healthBarFill.setVisible(false);
+    } else {
+        enemy.healthBar.setVisible(true);
+        enemy.healthBarFill.setVisible(true);
+    }
+}
+
+// Enhanced laser beam that extends until it hits a wall
+function createEnhancedLaser(scene, startX, startY, angle) {
+    if (!scene || laserActive) return;
+    
+    laserActive = true;
+    
+    // Calculate laser end point by raycasting until wall collision
+    const maxDistance = 800; // Maximum laser range
+    const step = 5; // Step size for collision detection
+    let currentX = startX;
+    let currentY = startY;
+    let distance = 0;
+    
+    // Raycast to find wall collision
+    while (distance < maxDistance) {
+        currentX += Math.cos(angle) * step;
+        currentY += Math.sin(angle) * step;
+        distance += step;
+        
+        // Check collision with walls
+        if (allWalls) {
+            let hitWall = false;
+            allWalls.children.entries.forEach(wall => {
+                if (wall && wall.active && 
+                    currentX >= wall.x && currentX <= wall.x + wall.width &&
+                    currentY >= wall.y && currentY <= wall.y + wall.height) {
+                    hitWall = true;
+                }
+            });
+            if (hitWall) break;
+        }
+        
+        // Check world bounds
+        if (currentX < 0 || currentX > worldWidth || currentY < 0 || currentY > worldHeight) {
+            break;
+        }
+    }
+    
+    // Create enhanced laser graphics
+    if (laserBeam) {
+        laserBeam.destroy();
+    }
+    
+    laserBeam = scene.add.graphics();
+    laserBeam.setDepth(15);
+    
+    // Main laser beam
+    laserBeam.lineStyle(4, 0x00ffff, 1);
+    laserBeam.beginPath();
+    laserBeam.moveTo(startX, startY);
+    laserBeam.lineTo(currentX, currentY);
+    laserBeam.strokePath();
+    
+    // Inner bright core
+    laserBeam.lineStyle(2, 0xffffff, 0.8);
+    laserBeam.beginPath();
+    laserBeam.moveTo(startX, startY);
+    laserBeam.lineTo(currentX, currentY);
+    laserBeam.strokePath();
+    
+    // Outer glow effect
+    laserBeam.lineStyle(8, 0x00ffff, 0.3);
+    laserBeam.beginPath();
+    laserBeam.moveTo(startX, startY);
+    laserBeam.lineTo(currentX, currentY);
+    laserBeam.strokePath();
+    
+    // Damage enemies along the laser path
+    if (enemies) {
+        enemies.children.entries.forEach(enemy => {
+            if (!enemy || !enemy.active) return;
+            
+            // Check if enemy is along laser path
+            const distToLine = distanceToLineSegment(
+                enemy.x, enemy.y,
+                startX, startY,
+                currentX, currentY
+            );
+            
+            if (distToLine < 20) { // Laser width
+                hitEnemy(enemy, null, currentWeapon.damage);
+            }
+        });
+    }
+}
+
+// Helper function to calculate distance from point to line segment
+function distanceToLineSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    if (length === 0) return Math.sqrt((px - x1) * (px - x1) + (py - y1) * (py - y1));
+    
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (length * length)));
+    const projX = x1 + t * dx;
+    const projY = y1 + t * dy;
+    
+    return Math.sqrt((px - projX) * (px - projX) + (py - projY) * (py - projY));
+}
+
+// Initialize enhanced systems
+function initializeEnhancedSystems() {
+    updateWeaponStats();
 }
